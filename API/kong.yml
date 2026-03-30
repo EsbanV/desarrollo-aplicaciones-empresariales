@@ -1,0 +1,15 @@
+_format_version: "3.0"
+
+services:
+  - name: flask-service
+    url: http://host.docker.internal:5000
+    routes:
+      - name: usuarios-route
+        paths:
+          - /api/v1/usuarios  # Sin la barra al final para que sea más flexible
+        strip_path: false     # Mantiene la ruta completa al enviarla a Flask
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 5       # Límite de peticiones por minuto (ajustable)
+              policy: local   # Obligatorio para entornos sin base de datos (DB-less)

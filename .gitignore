@@ -1,0 +1,42 @@
+# =========================
+# Entorno y Secretos (¡CRÍTICO!)
+# =========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# =========================
+# Python / Flask (Backend)
+# =========================
+# Archivos compilados
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+
+# Base de datos local (¡No subir la de pruebas!)
+*.sqlite3
+database.db
+*.db
+
+# =========================
+# Node / React / Vite (Frontend)
+# =========================
+node_modules/
+dist/
+build/
+.npm/
+
+# =========================
+# Editores y SO (VS Code, Mac, Windows)
+# =========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

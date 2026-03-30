@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "nombre": "Andrés Iturra",
+    "email": "andres.iturra@uach.cl",
+    "rol": "Admin"
+  },
+  {
+    "id": 2,
+    "nombre": "Francisca Lagos",
+    "email": "f.lagos@gmail.com",
+    "rol": "Editor"
+  },
+  {
+    "id": 3,
+    "nombre": "Carlos Valenzuela",
+    "email": "carlos.v@outlook.com",
+    "rol": "Usuario"
+  },
+  {
+    "id": 4,
+    "nombre": "María José Ruiz",
+    "email": "mj.ruiz@empresa.cl",
+    "rol": "Usuario"
+  },
+  {
+    "id": 5,
+    "nombre": "Sebastián Castro",
+    "email": "s.castro@uach.cl",
+    "rol": "Editor"
+  },
+  {
+    "id": 6,
+    "nombre": "Javiera Paz",
+    "email": "javiera.paz@gmail.com",
+    "rol": "Usuario"
+  },
+  {
+    "id": 7,
+    "nombre": "Ricardo Soto",
+    "email": "rsoto@tecnologia.cl",
+    "rol": "Admin"
+  },
+  {
+    "id": 8,
+    "nombre": "Camila Fernández",
+    "email": "cami.fdz@gmail.com",
+    "rol": "Usuario"
+  },
+  {
+    "id": 9,
+    "nombre": "Diego Morales",
+    "email": "dmorales@uach.cl",
+    "rol": "Usuario"
+  },
+  {
+    "id": 10,
+    "nombre": "Valentina Rivas",
+    "email": "v.rivas@web.com",
+    "rol": "Editor"
+  },
+  {
+    "id": 11,
+    "nombre": "Nicolás Oyarzún",
+    "email": "n.oyarzun@servicios.cl",
+    "rol": "Usuario"
+  },
+  {
+    "id": 12,
+    "nombre": "Paz Bustamante",
+    "email": "p.bustamante@gmail.com",
+    "rol": "Usuario"
+  },
+  {
+    "id": 13,
+    "nombre": "Matías Gatica",
+    "email": "mati.gatica@uach.cl",
+    "rol": "Admin"
+  },
+  {
+    "id": 14,
+    "nombre": "Antonia Jara",
+    "email": "a.jara@correo.cl",
+    "rol": "Usuario"
+  },
+  {
+    "id": 15,
+    "nombre": "Felipe Herrera",
+    "email": "felipe.h@tech.com",
+    "rol": "Editor"
+  },
+  {
+    "id": 16,
+    "nombre": "Constanza Silva",
+    "email": "connie.silva@gmail.com",
+    "rol": "Usuario"
+  },
+  {
+    "id": 17,
+    "nombre": "Benjamín Toro",
+    "email": "b.toro@uach.cl",
+    "rol": "Usuario"
+  },
+  {
+    "id": 18,
+    "nombre": "Daniela Vera",
+    "email": "d.vera@empresa.com",
+    "rol": "Usuario"
+  },
+  {
+    "id": 19,
+    "nombre": "Ignacio Rojas",
+    "email": "i.rojas@gmail.com",
+    "rol": "Editor"
+  },
+  {
+    "id": 20,
+    "nombre": "Bárbara Muñoz",
+    "email": "b.munoz@uach.cl",
+    "rol": "Usuario"
+  }
+]
