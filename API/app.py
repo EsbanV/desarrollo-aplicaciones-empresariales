@@ -1,26 +1,24 @@
 from flask import Flask
-from config import Config
-from extensions import db
-from routes.usuarios import usuarios_bp
-from flask_cors import CORS
+from flask_cors import CORS # Importante para conectar con React
+from models import db
+from routes.productos import api_bp
 
-def create_app():
-    app = Flask(__name__)
-    CORS(app)
-    app.config.from_object(Config)
+app = Flask(__name__)
+CORS(app) # Permite que tu frontend en React acceda a la API
 
-    # Inicializar la base de datos de manera limpia a través de extensions
-    db.init_app(app)
+# Configuración
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # Registrar el Blueprint de usuarios
-    app.register_blueprint(usuarios_bp, url_prefix='/api/v1/usuarios')
+# Inicialización
+db.init_app(app)
 
-    # Crear las tablas si no existen
-    with app.app_context():
-        db.create_all()
+# Registro de Rutas
+app.register_blueprint(api_bp, url_prefix='/api')
 
-    return app
+# Creación automática de tablas
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
-    app = create_app()
     app.run(debug=True, port=5000)

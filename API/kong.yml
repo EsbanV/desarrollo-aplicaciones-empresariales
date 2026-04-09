@@ -1,15 +1,47 @@
 _format_version: "3.0"
+_transform: true
 
 services:
-  - name: flask-service
+  - name: inventario-api
+    # IMPORTANTE: 
+    # Si usas Docker para Kong, usa: http://host.docker.internal:5000
+    # Si Kong es nativo, usa: http://localhost:5000
     url: http://host.docker.internal:5000
     routes:
-      - name: usuarios-route
+      - name: inventario-route
         paths:
-          - /api/v1/usuarios  # Sin la barra al final para que sea más flexible
-        strip_path: false     # Mantiene la ruta completa al enviarla a Flask
-        plugins:
-          - name: rate-limiting
-            config:
-              minute: 5       # Límite de peticiones por minuto (ajustable)
-              policy: local   # Obligatorio para entornos sin base de datos (DB-less)
+          - /
+        # Mantenemos el /api para que Flask lo reciba y no dé 404
+        strip_path: false 
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+
+    plugins:
+      # 1. Plugin de CORS: Vital para que React (puerto 5173) no sea bloqueado
+      - name: cors
+        config:
+          origins:
+            - http://localhost:5173
+          methods:
+            - GET
+            - POST
+            - OPTIONS
+          headers:
+            - Accept
+            - Content-Type
+            - Authorization
+          exposed_headers:
+            - Content-Length
+          max_age: 3600
+          preflight_continue: false
+
+      # 2. Rate Limiting: Para demostrar "productividad con IA" y seguridad
+      - name: rate-limiting
+        config:
+          minute: 20
+          policy: local
+
+      # 3. Request Termination (Opcional): 
+      # Útil si quieres probar respuestas rápidas desde el gateway
