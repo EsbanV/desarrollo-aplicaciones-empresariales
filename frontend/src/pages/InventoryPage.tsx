@@ -1,16 +1,28 @@
 import React, { useState } from 'react';
 import { useInventory } from '../hooks/useInventory';
-import { AlertCircle, Plus, Trash2, Minus, Tag, Hash, Loader2 } from 'lucide-react';
+import { AlertCircle, Plus, Trash2, Minus, Tag, Hash, Loader2, Pencil, Save, X } from 'lucide-react';
+
+type EditFormState = {
+    nombre: string;
+    stock: number;
+};
 
 const InventoryPage: React.FC = () => {
     const { productos, loading, error, addProducto, updateProducto, deleteProducto } = useInventory();
     const [actionLoading, setActionLoading] = useState<number | null>(null);
-
+    const [editingProductId, setEditingProductId] = useState<number | null>(null);
     const [formData, setFormData] = useState({
         nombre: '',
         stock: 0
     });
     const [formError, setFormError] = useState<string | null>(null);
+    const [editFormData, setEditFormData] = useState<EditFormState>({
+        nombre: '',
+        stock: 0
+    });
+    const [editError, setEditError] = useState<string | null>(null);
+
+    const selectedProduct = productos.find((producto) => producto.id === editingProductId) ?? null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,7 +57,60 @@ const InventoryPage: React.FC = () => {
     const handleDelete = async (id: number) => {
         setActionLoading(id);
         await deleteProducto(id);
+        if (editingProductId === id) {
+            setEditingProductId(null);
+            setEditError(null);
+        }
         setActionLoading(null);
+    };
+
+    const handleStartEdit = (producto: { id?: number; nombre: string; stock: number }) => {
+        if (!producto.id) return;
+
+        setEditingProductId(producto.id);
+        setEditFormData({
+            nombre: producto.nombre,
+            stock: producto.stock,
+        });
+        setEditError(null);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingProductId(null);
+        setEditError(null);
+    };
+
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setEditError(null);
+
+        if (!editingProductId) return;
+
+        if (!editFormData.nombre.trim()) {
+            setEditError('El nombre es obligatorio.');
+            return;
+        }
+
+        if (editFormData.stock < 0) {
+            setEditError('El stock no puede ser negativo.');
+            return;
+        }
+
+        setActionLoading(editingProductId);
+
+        const result = await updateProducto(editingProductId, {
+            nombre: editFormData.nombre.trim(),
+            stock: editFormData.stock,
+        });
+
+        setActionLoading(null);
+
+        if (result.success) {
+            setEditingProductId(null);
+            setEditFormData({ nombre: '', stock: 0 });
+        } else {
+            setEditError(result.message || 'Error desconocido al actualizar.');
+        }
     };
 
     return (
@@ -109,7 +174,7 @@ const InventoryPage: React.FC = () => {
                             <tr>
                                 <th scope="col" className="px-6 py-4 font-semibold">Producto</th>
                                 <th scope="col" className="px-6 py-4 font-semibold text-center w-32">Stock</th>
-                                <th scope="col" className="px-6 py-4 font-semibold text-right w-40">Acciones</th>
+                                <th scope="col" className="px-6 py-4 font-semibold text-right w-56">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/50">
@@ -135,6 +200,14 @@ const InventoryPage: React.FC = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => handleStartEdit(p)}
+                                                    disabled={actionLoading === p.id}
+                                                    className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white disabled:opacity-30"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                    Editar
+                                                </button>
                                                 <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-800">
                                                     <button 
                                                         onClick={() => handleUpdateStock(p.id!, p.stock, -1)}
@@ -172,6 +245,85 @@ const InventoryPage: React.FC = () => {
                     </table>
                 </div>
             </div>
+
+            {selectedProduct && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4 py-6 backdrop-blur-sm">
+                    <div className="w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl">
+                        <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
+                            <div>
+                                <h2 className="text-xl font-semibold flex items-center gap-2 text-indigo-300">
+                                    <Pencil className="w-5 h-5" /> Editar producto
+                                </h2>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Modifica el nombre o el stock de este producto.
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleCancelEdit}
+                                className="rounded-xl border border-slate-800 bg-slate-950/50 p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+                                aria-label="Cerrar edición"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveEdit} className="space-y-4 px-6 py-6">
+                            <div className="rounded-2xl border border-slate-800 bg-slate-950/30 px-4 py-3 text-sm text-slate-400">
+                                Editando: <span className="text-slate-200 font-medium">{selectedProduct.nombre}</span>
+                            </div>
+
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+                                    <Tag className="w-5 h-5" />
+                                </div>
+                                <input
+                                    type="text"
+                                    value={editFormData.nombre}
+                                    onChange={(e) => setEditFormData({ ...editFormData, nombre: e.target.value })}
+                                    className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 text-sm rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 block pl-10 p-3 transition-all placeholder-slate-600"
+                                    placeholder="Editar nombre del producto"
+                                />
+                            </div>
+
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+                                    <Hash className="w-5 h-5" />
+                                </div>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={editFormData.stock}
+                                    onChange={(e) => setEditFormData({ ...editFormData, stock: parseInt(e.target.value) || 0 })}
+                                    className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 text-sm rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 block pl-10 p-3 transition-all placeholder-slate-600"
+                                    placeholder="Stock"
+                                />
+                            </div>
+
+                            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={handleCancelEdit}
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-950/50 px-5 py-3 text-sm text-slate-300 transition-colors hover:bg-slate-800/50 hover:text-white"
+                                >
+                                    <X className="w-4 h-4" />
+                                    Cancelar
+                                </button>
+
+                                <button
+                                    type="submit"
+                                    disabled={actionLoading === selectedProduct.id}
+                                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-medium text-white transition-all hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {actionLoading === selectedProduct.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                    Guardar cambios
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
