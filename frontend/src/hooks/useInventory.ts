@@ -1,66 +1,101 @@
 import { useState, useCallback, useEffect } from 'react';
 import api from '../api/axiosConfig';
-import type { Producto } from '../types/inventory';
+import type { Empresa, Impresora } from '../types/inventory';
 
 export const useInventory = () => {
-    const [productos, setProductos] = useState<Producto[]>([]);
+    // State
+    const [empresas, setEmpresas] = useState<Empresa[]>([]);
+    const [impresoras, setImpresoras] = useState<Impresora[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchProductos = useCallback(async () => {
+    // Fetch All
+    const fetchAll = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const response = await api.get<Producto[]>('/productos');
-            setProductos(response.data);
+            const [resEmpresas, resImpresoras] = await Promise.all([
+                api.get<Empresa[]>('/empresas'),
+                api.get<Impresora[]>('/impresoras')
+            ]);
+            setEmpresas(resEmpresas.data);
+            setImpresoras(resImpresoras.data);
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Error al cargar productos');
+            setError(err.response?.data?.error || 'Error al cargar los datos');
         } finally {
             setLoading(false);
         }
     }, []);
 
-    const addProducto = async (producto: Omit<Producto, 'id'>) => {
+    // EMPRESAS CRUD
+    const addEmpresa = async (data: Omit<Empresa, 'id' | 'cant_equipos'>) => {
         try {
-            const response = await api.post<Producto>('/productos', producto);
-            setProductos((prev) => [...prev, response.data]);
+            const res = await api.post<Empresa>('/empresas', data);
+            setEmpresas(prev => [...prev, res.data]);
             return { success: true };
         } catch (err: any) {
-            return { success: false, message: err.response?.data?.error || 'Error al conectar con la API' };
+            return { success: false, message: err.response?.data?.error || 'Error al añadir empresa' };
         }
     };
 
-    const updateProducto = async (id: number, data: Partial<Producto>) => {
+    const deleteEmpresa = async (id: number) => {
         try {
-            const response = await api.put<Producto>(`/productos/${id}`, data);
-            setProductos((prev) => prev.map(p => p.id === id ? response.data : p));
+            await api.delete(`/empresas/${id}`);
+            setEmpresas(prev => prev.filter(e => e.id !== id));
+            fetchAll(); // Actualizar impresoras por si perdieron el arrendatario
             return { success: true };
         } catch (err: any) {
-            return { success: false, message: err.response?.data?.error || 'Error al actualizar el producto' };
+            return { success: false, message: err.response?.data?.error || 'Error al eliminar empresa' };
         }
     };
 
-    const deleteProducto = async (id: number) => {
+    // IMPRESORAS CRUD
+    const addImpresora = async (data: Omit<Impresora, 'id' | 'cliente_actual'>) => {
         try {
-            await api.delete(`/productos/${id}`);
-            setProductos((prev) => prev.filter(p => p.id !== id));
+            const res = await api.post<Impresora>('/impresoras', data);
+            setImpresoras(prev => [...prev, res.data]);
             return { success: true };
         } catch (err: any) {
-            return { success: false, message: err.response?.data?.error || 'Error al eliminar el producto' };
+            return { success: false, message: err.response?.data?.error || 'Error al añadir impresora' };
+        }
+    };
+
+    const updateImpresora = async (id: number, data: Partial<Impresora>) => {
+        try {
+            const res = await api.put<Impresora>(`/impresoras/${id}`, data);
+            setImpresoras(prev => prev.map(i => i.id === id ? res.data : i));
+            fetchAll(); // Refrescar empresas para actualizar cantidad de equipos
+            return { success: true };
+        } catch (err: any) {
+            return { success: false, message: err.response?.data?.error || 'Error al actualizar impresora' };
+        }
+    };
+
+    const deleteImpresora = async (id: number) => {
+        try {
+            await api.delete(`/impresoras/${id}`);
+            setImpresoras(prev => prev.filter(i => i.id !== id));
+            fetchAll();
+            return { success: true };
+        } catch (err: any) {
+            return { success: false, message: err.response?.data?.error || 'Error al eliminar impresora' };
         }
     };
 
     useEffect(() => {
-        fetchProductos();
-    }, [fetchProductos]);
+        fetchAll();
+    }, [fetchAll]);
 
-    return { 
-        productos, 
-        loading, 
-        error, 
-        addProducto, 
-        updateProducto, 
-        deleteProducto, 
-        refresh: fetchProductos 
+    return {
+        empresas,
+        impresoras,
+        loading,
+        error,
+        addEmpresa,
+        deleteEmpresa,
+        addImpresora,
+        updateImpresora,
+        deleteImpresora,
+        refresh: fetchAll
     };
 };
