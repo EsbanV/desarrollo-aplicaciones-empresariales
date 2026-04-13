@@ -125,6 +125,8 @@ def delete_empresa(id):
         for impresora in empresa.activos:
             impresora.empresa_id = None
             impresora.estado = 'Disponible'
+            impresora.fecha_inicio = None
+            impresora.fecha_termino = None
 
         db.session.delete(empresa)
         db.session.commit()
@@ -231,6 +233,8 @@ def add_impresora():
             serial=data['serial'], 
             modelo=data['modelo'],
             estado=data.get('estado', 'Disponible'),
+            fecha_inicio=data.get('fecha_inicio'),
+            fecha_termino=data.get('fecha_termino'),
             valor_arriendo=data.get('valor_arriendo', 0),
             empresa_id=data.get('empresa_id')
         )
@@ -259,6 +263,10 @@ def update_impresora(id):
             impresora.modelo = data['modelo']
         if 'estado' in data:
             impresora.estado = data['estado']
+        if 'fecha_inicio' in data:
+            impresora.fecha_inicio = data['fecha_inicio']
+        if 'fecha_termino' in data:
+            impresora.fecha_termino = data['fecha_termino']
         if 'valor_arriendo' in data:
             impresora.valor_arriendo = data['valor_arriendo']
         if 'empresa_id' in data:

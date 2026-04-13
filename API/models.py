@@ -40,6 +40,8 @@ class Impresora(db.Model):
     serial = db.Column(db.String(50), unique=True, nullable=False)
     modelo = db.Column(db.String(100), nullable=False)
     estado = db.Column(db.String(20), default='Disponible')
+    fecha_inicio = db.Column(db.String(10), nullable=True)
+    fecha_termino = db.Column(db.String(10), nullable=True)
     
     # NUEVO: Valor de arriendo mensual (usamos Integer o Numeric)
     valor_arriendo = db.Column(db.Integer, default=0) 
@@ -52,6 +54,8 @@ class Impresora(db.Model):
             "serial": self.serial,
             "modelo": self.modelo,
             "estado": self.estado,
+            "fecha_inicio": self.fecha_inicio,
+            "fecha_termino": self.fecha_termino,
             "valor_arriendo": self.valor_arriendo,
             "empresa_id": self.empresa_id,
             "cliente_actual": self.empresa_cliente.razon_social if self.empresa_id and self.empresa_cliente else "STOCK"
