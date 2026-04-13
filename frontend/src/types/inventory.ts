@@ -12,6 +12,8 @@ export interface Impresora {
   serial: string;
   modelo: string;
   estado?: string;
+  fecha_inicio?: string | null;
+  fecha_termino?: string | null;
   valor_arriendo?: number;
   empresa_id?: number | null;
   cliente_actual?: string;

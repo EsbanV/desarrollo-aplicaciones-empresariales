@@ -2,6 +2,7 @@ from flask import Flask
 from flask_cors import CORS # Importante para conectar con React
 from flask_jwt_extended import JWTManager
 from werkzeug.security import generate_password_hash
+from sqlalchemy import inspect, text
 from models import db, Usuario
 from routes.api import api_bp
 
@@ -23,6 +24,15 @@ app.register_blueprint(api_bp, url_prefix='/api')
 # Creación automática de tablas y sembrado
 with app.app_context():
     db.create_all()
+
+    inspector = inspect(db.engine)
+    if 'impresoras' in inspector.get_table_names():
+        existing_columns = {column['name'] for column in inspector.get_columns('impresoras')}
+        with db.engine.begin() as connection:
+            if 'fecha_inicio' not in existing_columns:
+                connection.execute(text("ALTER TABLE impresoras ADD COLUMN fecha_inicio VARCHAR(10)"))
+            if 'fecha_termino' not in existing_columns:
+                connection.execute(text("ALTER TABLE impresoras ADD COLUMN fecha_termino VARCHAR(10)"))
     
     # Creación de dos usuarios base si la base está en blanco
     if not Usuario.query.first():

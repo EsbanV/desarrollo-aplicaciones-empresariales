@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useInventory } from '../hooks/useInventory';
-import { Building2, Printer, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Building2, Printer, Plus, Trash2, Loader2, Calendar, AlertCircle } from 'lucide-react';
 
 const InventoryPage: React.FC = () => {
     const {
@@ -14,16 +14,15 @@ const InventoryPage: React.FC = () => {
 
     // Forms states
     const [empresaForm, setEmpresaForm] = useState({ rut: '', razon_social: '', giro: '' });
-    const [impresoraForm, setImpresoraForm] = useState({ serial: '', modelo: '', valor_arriendo: 0 });
+    const [impresoraForm, setImpresoraForm] = useState({
+        serial: '',
+        modelo: '',
+        valor_arriendo: 0,
+        fecha_inicio: '',
+        fecha_termino: ''
+    });
 
     const [formError, setFormError] = useState<string | null>(null);
-    const [editFormData, setEditFormData] = useState<EditFormState>({
-        nombre: '',
-        stock: 0
-    });
-    const [editError, setEditError] = useState<string | null>(null);
-
-    const selectedProduct = productos.find((producto) => producto.id === editingProductId) ?? null;
 
     const handleAddEmpresa = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,7 +44,15 @@ const InventoryPage: React.FC = () => {
             return;
         }
         const res = await addImpresora(impresoraForm);
-        if (res.success) setImpresoraForm({ serial: '', modelo: '', valor_arriendo: 0 });
+        if (res.success) {
+            setImpresoraForm({
+                serial: '',
+                modelo: '',
+                valor_arriendo: 0,
+                fecha_inicio: '',
+                fecha_termino: ''
+            });
+        }
         else setFormError(res.message!);
     };
 
@@ -64,60 +71,79 @@ const InventoryPage: React.FC = () => {
     const handleAssign = async (impresoraId: number, empresaId: string) => {
         setActionLoading(impresoraId);
         const empIdNum = empresaId ? parseInt(empresaId) : null;
+        const currentPrinter = impresoras.find((impresora) => impresora.id === impresoraId);
+
+        const today = new Date();
+        const fechaInicio = today.toISOString().slice(0, 10);
+        const fechaTerminoDate = new Date(today);
+        fechaTerminoDate.setFullYear(fechaTerminoDate.getFullYear() + 1);
+        const fechaTermino = fechaTerminoDate.toISOString().slice(0, 10);
+
         await updateImpresora(impresoraId, {
             empresa_id: empIdNum,
-            estado: empIdNum ? 'Arrendada' : 'Disponible'
+            estado: empIdNum ? 'Arrendada' : 'Disponible',
+            // Conserva fechas existentes para que al desasignar y reasignar
+            // no se reinicie el contrato automáticamente.
+            fecha_inicio: empIdNum
+                ? (currentPrinter?.fecha_inicio || fechaInicio)
+                : (currentPrinter?.fecha_inicio || null),
+            fecha_termino: empIdNum
+                ? (currentPrinter?.fecha_termino || fechaTermino)
+                : (currentPrinter?.fecha_termino || null)
         });
         setActionLoading(null);
     };
 
-    const handleStartEdit = (producto: { id?: number; nombre: string; stock: number }) => {
-        if (!producto.id) return;
-
-        setEditingProductId(producto.id);
-        setEditFormData({
-            nombre: producto.nombre,
-            stock: producto.stock,
-        });
-        setEditError(null);
+    const formatDate = (dateString?: string | null) => {
+        if (!dateString) return 'Sin fecha';
+        const date = new Date(`${dateString}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return 'Fecha inválida';
+        return date.toLocaleDateString('es-CL');
     };
 
-    const handleCancelEdit = () => {
-        setEditingProductId(null);
-        setEditError(null);
-    };
-
-    const handleSaveEdit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setEditError(null);
-
-        if (!editingProductId) return;
-
-        if (!editFormData.nombre.trim()) {
-            setEditError('El nombre es obligatorio.');
-            return;
+    const getContractBadge = (estado?: string, fechaTermino?: string | null) => {
+        if (estado !== 'Arrendada') {
+            return null;
         }
 
-        if (editFormData.stock < 0) {
-            setEditError('El stock no puede ser negativo.');
-            return;
+        if (!fechaTermino) {
+            return {
+                label: 'Sin término',
+                className: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+            };
         }
 
-        setActionLoading(editingProductId);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const end = new Date(`${fechaTermino}T00:00:00`);
 
-        const result = await updateProducto(editingProductId, {
-            nombre: editFormData.nombre.trim(),
-            stock: editFormData.stock,
-        });
-
-        setActionLoading(null);
-
-        if (result.success) {
-            setEditingProductId(null);
-            setEditFormData({ nombre: '', stock: 0 });
-        } else {
-            setEditError(result.message || 'Error desconocido al actualizar.');
+        if (Number.isNaN(end.getTime())) {
+            return {
+                label: 'Fecha inválida',
+                className: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+            };
         }
+
+        const daysDiff = Math.floor((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysDiff < 0) {
+            return {
+                label: 'Vencido',
+                className: 'bg-red-500/10 text-red-400 border-red-500/20',
+            };
+        }
+
+        if (daysDiff <= 15) {
+            return {
+                label: 'Por vencer',
+                className: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+            };
+        }
+
+        return {
+            label: 'Vigente',
+            className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+        };
     };
 
     return (
@@ -176,6 +202,26 @@ const InventoryPage: React.FC = () => {
                                     className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
                                 />
                             </div>
+                            <div className="flex-1 relative">
+                                <label className="absolute -top-2.5 left-3 text-xs bg-slate-900 px-1 text-slate-400">Desde</label>
+                                <input
+                                    type="date"
+                                    value={impresoraForm.fecha_inicio}
+                                    onChange={e => setImpresoraForm({ ...impresoraForm, fecha_inicio: e.target.value })}
+                                    className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                    title="Fecha de inicio"
+                                />
+                            </div>
+                            <div className="flex-1 relative">
+                                <label className="absolute -top-2.5 left-3 text-xs bg-slate-900 px-1 text-slate-400">Hasta</label>
+                                <input
+                                    type="date"
+                                    value={impresoraForm.fecha_termino}
+                                    onChange={e => setImpresoraForm({ ...impresoraForm, fecha_termino: e.target.value })}
+                                    className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                    title="Fecha de término"
+                                />
+                            </div>
                             <button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-medium transition-all flex items-center justify-center">
                                 {loading && !impresoras.length ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Guardar'}
                             </button>
@@ -190,12 +236,16 @@ const InventoryPage: React.FC = () => {
                                     <tr>
                                         <th className="px-6 py-4">Impresora</th>
                                         <th className="px-6 py-4 text-center">Estado</th>
+                                        <th className="px-6 py-4">Contrato</th>
                                         <th className="px-6 py-4">Asignación</th>
                                         <th className="px-6 py-4 text-right">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
                                     {impresoras.map(i => (
+                                        (() => {
+                                            const contractBadge = getContractBadge(i.estado, i.fecha_termino);
+                                            return (
                                         <tr key={i.id} className="hover:bg-slate-800/30 group transition-colors">
                                             <td className="px-6 py-4 font-medium text-slate-200">
                                                 {i.modelo}
@@ -205,6 +255,30 @@ const InventoryPage: React.FC = () => {
                                                 <span className={`px-3 py-1 rounded-full text-xs font-bold border ${i.estado === 'Disponible' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
                                                     {i.estado}
                                                 </span>
+                                                {contractBadge && (
+                                                    <div className="mt-2 flex justify-center">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 ${contractBadge.className}`}>
+                                                            <AlertCircle className="w-3.5 h-3.5" />
+                                                            {contractBadge.label}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {i.estado === 'Arrendada' ? (
+                                                    <div className="space-y-1 text-xs text-slate-300">
+                                                        <div className="inline-flex items-center gap-2">
+                                                            <Calendar className="w-3.5 h-3.5 text-indigo-300" />
+                                                            <span>Inicio: {formatDate(i.fecha_inicio)}</span>
+                                                        </div>
+                                                        <div className="inline-flex items-center gap-2">
+                                                            <Calendar className="w-3.5 h-3.5 text-indigo-300" />
+                                                            <span>Término: {formatDate(i.fecha_termino)}</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-slate-500">Sin contrato</span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <select
@@ -225,9 +299,11 @@ const InventoryPage: React.FC = () => {
                                                 </button>
                                             </td>
                                         </tr>
+                                            );
+                                        })()
                                     ))}
                                     {impresoras.length === 0 && (
-                                        <tr><td colSpan={4} className="text-center py-12 text-slate-500">No hay impresoras registradas en el sistema.</td></tr>
+                                        <tr><td colSpan={5} className="text-center py-12 text-slate-500">No hay impresoras registradas en el sistema.</td></tr>
                                     )}
                                 </tbody>
                             </table>
