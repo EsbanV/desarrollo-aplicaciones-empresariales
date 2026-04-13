@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useInventory } from '../hooks/useInventory';
 import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3, Calendar, AlertCircle } from 'lucide-react';
+import type { Empresa, Impresora } from '../types/inventory';
 
 const InventoryPage: React.FC = () => {
     const {
@@ -18,7 +19,9 @@ const InventoryPage: React.FC = () => {
     const [impresoraForm, setImpresoraForm] = useState({
         serial: '',
         modelo: '',
-        valor_arriendo: '' as number | string
+        valor_arriendo: '' as number | string,
+        fecha_inicio: '',
+        fecha_termino: ''
     });
 
     const [formError, setFormError] = useState<string | null>(null);
@@ -65,9 +68,20 @@ const InventoryPage: React.FC = () => {
             setFormError('Serial y Modelo son obligatorios');
             return;
         }
-        const dataToSend = { ...impresoraForm, valor_arriendo: impresoraForm.valor_arriendo === '' ? 0 : Number(impresoraForm.valor_arriendo) };
+        const dataToSend = {
+            ...impresoraForm,
+            valor_arriendo: impresoraForm.valor_arriendo === '' ? 0 : Number(impresoraForm.valor_arriendo),
+        };
         const res = await addImpresora(dataToSend);
-        if (res.success) setImpresoraForm({ serial: '', modelo: '', valor_arriendo: '' });
+        if (res.success) {
+            setImpresoraForm({
+                serial: '',
+                modelo: '',
+                valor_arriendo: '',
+                fecha_inicio: '',
+                fecha_termino: ''
+            });
+        }
         else setFormError(res.message!);
     };
 
@@ -109,7 +123,8 @@ const InventoryPage: React.FC = () => {
         setActionLoading(null);
     };
 
-    const startEditImpresora = (i: any) => {
+    const startEditImpresora = (i: Impresora) => {
+        if (!i.id) return;
         setEditImpresoraId(i.id);
         setEditImpresoraForm({ 
             serial: i.serial, 
@@ -128,7 +143,8 @@ const InventoryPage: React.FC = () => {
         setActionLoading(null);
     };
 
-    const startEditEmpresa = (e: any) => {
+    const startEditEmpresa = (e: Empresa) => {
+        if (!e.id) return;
         setEditEmpresaId(e.id);
         setEditEmpresaForm({ rut: e.rut, razon_social: e.razon_social, giro: e.giro || '' });
     };
@@ -255,7 +271,7 @@ const InventoryPage: React.FC = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border/30">
-                                            {stats.modelos.map((m: any, idx: number) => (
+                                            {stats.modelos.map((m: { nombre: string; total: number; arrendadas: number; disponibles: number }, idx: number) => (
                                                 <tr key={idx} className="hover:bg-muted/20 transition-colors">
                                                     <td className="px-3 py-2 font-medium text-foreground">{m.nombre}</td>
                                                     <td className="px-3 py-2 text-center">{m.total}</td>
@@ -298,6 +314,24 @@ const InventoryPage: React.FC = () => {
                                     min="0"
                                     value={impresoraForm.valor_arriendo}
                                     onChange={e => setImpresoraForm({ ...impresoraForm, valor_arriendo: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                                    className="w-full bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/50 outline-none"
+                                />
+                            </div>
+                            <div className="flex-1 relative">
+                                <label className="absolute -top-2.5 left-3 text-xs bg-slate-900 px-1 text-slate-400">Desde</label>
+                                <input
+                                    type="date"
+                                    value={impresoraForm.fecha_inicio}
+                                    onChange={e => setImpresoraForm({ ...impresoraForm, fecha_inicio: e.target.value })}
+                                    className="w-full bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/50 outline-none"
+                                />
+                            </div>
+                            <div className="flex-1 relative">
+                                <label className="absolute -top-2.5 left-3 text-xs bg-slate-900 px-1 text-slate-400">Hasta</label>
+                                <input
+                                    type="date"
+                                    value={impresoraForm.fecha_termino}
+                                    onChange={e => setImpresoraForm({ ...impresoraForm, fecha_termino: e.target.value })}
                                     className="w-full bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/50 outline-none"
                                 />
                             </div>
