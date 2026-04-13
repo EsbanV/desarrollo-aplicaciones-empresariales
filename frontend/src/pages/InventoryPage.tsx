@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useInventory } from '../hooks/useInventory';
-import { Building2, Printer, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3 } from 'lucide-react';
 
 const InventoryPage: React.FC = () => {
     const {
-        empresas, impresoras, loading, error,
-        addEmpresa, deleteEmpresa,
-        addImpresora, deleteImpresora, updateImpresora
+        empresas, impresoras, modelosDisponibles, stats, loading, error,
+        addEmpresa, deleteEmpresa, updateEmpresa,
+        addImpresora, deleteImpresora, updateImpresora,
+        fetchImpresoras
     } = useInventory();
 
     const [activeTab, setActiveTab] = useState<'impresoras' | 'empresas'>('impresoras');
@@ -14,16 +15,31 @@ const InventoryPage: React.FC = () => {
 
     // Forms states
     const [empresaForm, setEmpresaForm] = useState({ rut: '', razon_social: '', giro: '' });
-    const [impresoraForm, setImpresoraForm] = useState({ serial: '', modelo: '', valor_arriendo: 0 });
+    const [impresoraForm, setImpresoraForm] = useState({ serial: '', modelo: '', valor_arriendo: '' as number | string });
 
     const [formError, setFormError] = useState<string | null>(null);
-    const [editFormData, setEditFormData] = useState<EditFormState>({
-        nombre: '',
-        stock: 0
-    });
-    const [editError, setEditError] = useState<string | null>(null);
 
-    const selectedProduct = productos.find((producto) => producto.id === editingProductId) ?? null;
+    // Edit states
+    const [editImpresoraId, setEditImpresoraId] = useState<number | null>(null);
+    const [editImpresoraForm, setEditImpresoraForm] = useState({ serial: '', modelo: '', valor_arriendo: 0 });
+
+    const [editEmpresaId, setEditEmpresaId] = useState<number | null>(null);
+    const [editEmpresaForm, setEditEmpresaForm] = useState({ rut: '', razon_social: '', giro: '' });
+    // Filter states
+    const [filterSerial, setFilterSerial] = useState('');
+    const [filterModelo, setFilterModelo] = useState('');
+    const [filterEmpresa, setFilterEmpresa] = useState('');
+
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            fetchImpresoras({
+                serial: filterSerial || undefined,
+                modelo: filterModelo || undefined,
+                empresa_id: filterEmpresa || undefined
+            });
+        }, 500);
+        return () => clearTimeout(timeoutId);
+    }, [filterSerial, filterModelo, filterEmpresa, fetchImpresoras]);
 
     const handleAddEmpresa = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,8 +60,9 @@ const InventoryPage: React.FC = () => {
             setFormError('Serial y Modelo son obligatorios');
             return;
         }
-        const res = await addImpresora(impresoraForm);
-        if (res.success) setImpresoraForm({ serial: '', modelo: '', valor_arriendo: 0 });
+        const dataToSend = { ...impresoraForm, valor_arriendo: impresoraForm.valor_arriendo === '' ? 0 : Number(impresoraForm.valor_arriendo) };
+        const res = await addImpresora(dataToSend);
+        if (res.success) setImpresoraForm({ serial: '', modelo: '', valor_arriendo: '' });
         else setFormError(res.message!);
     };
 
@@ -71,68 +88,50 @@ const InventoryPage: React.FC = () => {
         setActionLoading(null);
     };
 
-    const handleStartEdit = (producto: { id?: number; nombre: string; stock: number }) => {
-        if (!producto.id) return;
-
-        setEditingProductId(producto.id);
-        setEditFormData({
-            nombre: producto.nombre,
-            stock: producto.stock,
-        });
-        setEditError(null);
+    const startEditImpresora = (i: any) => {
+        setEditImpresoraId(i.id);
+        setEditImpresoraForm({ serial: i.serial, modelo: i.modelo, valor_arriendo: i.valor_arriendo || 0 });
     };
-
-    const handleCancelEdit = () => {
-        setEditingProductId(null);
-        setEditError(null);
-    };
-
-    const handleSaveEdit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setEditError(null);
-
-        if (!editingProductId) return;
-
-        if (!editFormData.nombre.trim()) {
-            setEditError('El nombre es obligatorio.');
-            return;
-        }
-
-        if (editFormData.stock < 0) {
-            setEditError('El stock no puede ser negativo.');
-            return;
-        }
-
-        setActionLoading(editingProductId);
-
-        const result = await updateProducto(editingProductId, {
-            nombre: editFormData.nombre.trim(),
-            stock: editFormData.stock,
-        });
-
+    const saveEditImpresora = async (id: number) => {
+        setActionLoading(id);
+        const res = await updateImpresora(id, editImpresoraForm);
+        if (res.success) setEditImpresoraId(null);
+        else setFormError(res.message!);
         setActionLoading(null);
-
-        if (result.success) {
-            setEditingProductId(null);
-            setEditFormData({ nombre: '', stock: 0 });
-        } else {
-            setEditError(result.message || 'Error desconocido al actualizar.');
-        }
     };
+
+    const startEditEmpresa = (e: any) => {
+        setEditEmpresaId(e.id);
+        setEditEmpresaForm({ rut: e.rut, razon_social: e.razon_social, giro: e.giro || '' });
+    };
+    const saveEditEmpresa = async (id: number) => {
+        setActionLoading(id);
+        const res = await updateEmpresa(id, editEmpresaForm);
+        if (res.success) setEditEmpresaId(null);
+        else setFormError(res.message!);
+        setActionLoading(null);
+    };
+
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
+            <header className="text-center space-y-3 mb-2">
+                <h1 className="text-3xl md:text-5xl font-extrabold bg-gradient-to-br from-white via-purple-300 to-primary bg-clip-text text-transparent tracking-tight drop-shadow-lg">
+                    {activeTab === 'impresoras' ? 'Inventario de Impresoras' : 'Directorio de Socios'}
+                </h1>
+            </header>
+
             {/* TABS MENU */}
             <div className="flex gap-4 border-b border-slate-800 pb-4">
                 <button
                     onClick={() => setActiveTab('impresoras')}
-                    className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${activeTab === 'impresoras' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25' : 'bg-slate-900/50 text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                    className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${activeTab === 'impresoras' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'bg-black/30 text-slate-400 hover:text-foreground hover:bg-black/50'}`}
                 >
                     <Printer className="w-5 h-5" /> Impresoras
                 </button>
                 <button
                     onClick={() => setActiveTab('empresas')}
-                    className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${activeTab === 'empresas' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25' : 'bg-slate-900/50 text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                    className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${activeTab === 'empresas' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'bg-black/30 text-slate-400 hover:text-foreground hover:bg-black/50'}`}
                 >
                     <Building2 className="w-5 h-5" /> Empresas
                 </button>
@@ -148,8 +147,54 @@ const InventoryPage: React.FC = () => {
             {activeTab === 'impresoras' ? (
                 // --- TAB: IMPRESORAS ---
                 <div className="space-y-8">
+                    {/* Panel de Estadísticas Globales */}
+                    {stats && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
+                            <div className="glass p-6 flex flex-col items-center justify-center text-center">
+                                <h3 className="text-muted-foreground font-medium mb-1 text-sm">Inventario Total</h3>
+                                <div className="text-4xl font-extrabold text-foreground">{stats.total_equipos}</div>
+                            </div>
+                            <div className="glass p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl"></div>
+                                <h3 className="text-muted-foreground font-medium mb-1 text-sm">Disponibles</h3>
+                                <div className="text-4xl font-extrabold text-primary">{stats.total_disponibles}</div>
+                            </div>
+                            <div className="glass-panel p-6 col-span-1 md:col-span-2 lg:col-span-2">
+                                <h3 className="text-sm font-semibold text-foreground tracking-wider mb-4 flex items-center gap-2">
+                                    <BarChart3 className="w-4 h-4 text-primary" />
+                                    Resumen por Modelo
+                                </h3>
+                                <div className="overflow-y-auto max-h-40 pe-2 custom-scrollbar">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="text-xs text-muted-foreground uppercase border-b border-border/50 sticky top-0 bg-popover/80 backdrop-blur-md">
+                                            <tr>
+                                                <th className="px-3 py-2">Modelo</th>
+                                                <th className="px-3 py-2 text-center">Total</th>
+                                                <th className="px-3 py-2 text-center">Arrend.</th>
+                                                <th className="px-3 py-2 text-center">Disp.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border/30">
+                                            {stats.modelos.map((m: any, idx: number) => (
+                                                <tr key={idx} className="hover:bg-muted/20 transition-colors">
+                                                    <td className="px-3 py-2 font-medium text-foreground">{m.nombre}</td>
+                                                    <td className="px-3 py-2 text-center">{m.total}</td>
+                                                    <td className="px-3 py-2 text-center text-accent font-semibold">{m.arrendadas}</td>
+                                                    <td className="px-3 py-2 text-center text-primary font-semibold">{m.disponibles}</td>
+                                                </tr>
+                                            ))}
+                                            {stats.modelos.length === 0 && (
+                                                <tr><td colSpan={4} className="text-center py-4 text-muted-foreground">No hay datos.</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Formulario Impresora */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl shadow-2xl">
+                    <div className="glass-panel p-6 md:p-8 relative overflow-hidden animate-fade-in">
                         <h2 className="text-xl font-semibold mb-6 flex items-center gap-2 text-indigo-300">
                             <Plus className="w-5 h-5" /> Registrar Impresora
                         </h2>
@@ -158,13 +203,13 @@ const InventoryPage: React.FC = () => {
                                 placeholder="Serial (ej. S1234)"
                                 value={impresoraForm.serial}
                                 onChange={e => setImpresoraForm({ ...impresoraForm, serial: e.target.value })}
-                                className="flex-1 bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                className="flex-1 bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
                             />
                             <input
                                 placeholder="Modelo"
                                 value={impresoraForm.modelo}
                                 onChange={e => setImpresoraForm({ ...impresoraForm, modelo: e.target.value })}
-                                className="flex-1 bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                className="flex-1 bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
                             />
                             <div className="flex-1 relative">
                                 <label className="absolute -top-2.5 left-3 text-xs bg-slate-900 px-1 text-slate-400">Arriendo ($)</label>
@@ -172,21 +217,55 @@ const InventoryPage: React.FC = () => {
                                     type="number"
                                     min="0"
                                     value={impresoraForm.valor_arriendo}
-                                    onChange={e => setImpresoraForm({ ...impresoraForm, valor_arriendo: parseInt(e.target.value) || 0 })}
-                                    className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                    onChange={e => setImpresoraForm({ ...impresoraForm, valor_arriendo: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                                    className="w-full bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/50 outline-none"
                                 />
                             </div>
-                            <button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-medium transition-all flex items-center justify-center">
+                            <button type="submit" disabled={loading} className="bg-primary hover:bg-primary/80 text-primary-foreground px-6 py-3 rounded-xl font-medium transition-all flex items-center justify-center">
                                 {loading && !impresoras.length ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Guardar'}
                             </button>
                         </form>
                     </div>
 
+                    {/* Filtros Impresoras */}
+                    <div className="glass-panel p-6 md:p-8 relative overflow-hidden animate-fade-in">
+                        <h3 className="text-lg font-medium mb-4 text-indigo-300">Filtros de Búsqueda</h3>
+                        <div className="flex flex-col md:flex-row gap-4">
+                            <input
+                                placeholder="Buscar por serial..."
+                                value={filterSerial}
+                                onChange={e => setFilterSerial(e.target.value)}
+                                className="flex-1 bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                            />
+                            <select
+                                value={filterModelo}
+                                onChange={e => setFilterModelo(e.target.value)}
+                                className="flex-1 bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                            >
+                                <option value="">Todos los Modelos</option>
+                                {modelosDisponibles.map(m => (
+                                    <option key={m} value={m}>{m}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={filterEmpresa}
+                                onChange={e => setFilterEmpresa(e.target.value)}
+                                className="flex-1 bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                            >
+                                <option value="">Todas las Empresas</option>
+                                <option value="unassigned">-- Sin Asignar --</option>
+                                {empresas.map(emp => (
+                                    <option key={emp.id} value={String(emp.id)}>{emp.razon_social}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
                     {/* Tabla Impresoras */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-xl shadow-2xl">
+                    <div className="glass-panel overflow-hidden relative animate-fade-in">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left text-slate-300">
-                                <thead className="bg-slate-950/50 border-b border-slate-800 text-slate-400 uppercase text-xs">
+                                <thead className="bg-black/40 border-b border-white/5 text-slate-300 uppercase text-xs">
                                     <tr>
                                         <th className="px-6 py-4">Impresora</th>
                                         <th className="px-6 py-4 text-center">Estado</th>
@@ -196,38 +275,73 @@ const InventoryPage: React.FC = () => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
                                     {impresoras.map(i => (
-                                        <tr key={i.id} className="hover:bg-slate-800/30 group transition-colors">
-                                            <td className="px-6 py-4 font-medium text-slate-200">
-                                                {i.modelo}
-                                                <div className="text-xs text-slate-500 mt-1">SN: {i.serial} | Arriendo: ${i.valor_arriendo}/mes</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${i.estado === 'Disponible' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
-                                                    {i.estado}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <select
-                                                    value={i.empresa_id || ''}
-                                                    onChange={(e) => handleAssign(i.id!, e.target.value)}
-                                                    className="bg-slate-950 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition-colors cursor-pointer w-full max-w-[200px]"
-                                                    disabled={actionLoading === i.id}
-                                                >
-                                                    <option value="">-- Sin asignar --</option>
-                                                    {empresas.map(emp => (
-                                                        <option key={emp.id} value={emp.id}>{emp.razon_social}</option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button onClick={() => handleDeleteImpresora(i.id!)} disabled={actionLoading === i.id} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20">
-                                                    {actionLoading === i.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                                </button>
-                                            </td>
+                                        <tr key={i.id} className="hover:bg-white/5 group transition-all duration-300 relative">
+                                            {editImpresoraId === i.id ? (
+                                                <>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col gap-2">
+                                                            <input value={editImpresoraForm.modelo} onChange={e => setEditImpresoraForm({...editImpresoraForm, modelo: e.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full" placeholder="Modelo" />
+                                                            <div className="flex gap-2">
+                                                                <input value={editImpresoraForm.serial} onChange={e => setEditImpresoraForm({...editImpresoraForm, serial: e.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-1/2" placeholder="Serial" />
+                                                                <input type="number" value={editImpresoraForm.valor_arriendo} onChange={e => setEditImpresoraForm({...editImpresoraForm, valor_arriendo: parseInt(e.target.value)||0})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-1/2" placeholder="$ Arriendo" />
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <span className="text-slate-500 text-xs">-</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-slate-500 text-xs block text-center">-</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex justify-end items-center gap-1">
+                                                            <button onClick={() => saveEditImpresora(i.id!)} disabled={actionLoading === i.id} className="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors">
+                                                                {actionLoading === i.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                                            </button>
+                                                            <button onClick={() => setEditImpresoraId(null)} disabled={actionLoading === i.id} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <td className="px-6 py-4 font-medium text-slate-200">
+                                                        {i.modelo}
+                                                        <div className="text-xs text-slate-500 mt-1">SN: {i.serial} | Arriendo: ${i.valor_arriendo}/mes</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${i.estado === 'Disponible' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
+                                                            {i.estado}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <select
+                                                            value={i.empresa_id || ''}
+                                                            onChange={(e) => handleAssign(i.id!, e.target.value)}
+                                                            className="bg-black/50 border border-white/10 text-slate-300 text-sm rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition-colors cursor-pointer w-full max-w-[200px]"
+                                                            disabled={actionLoading === i.id}
+                                                        >
+                                                            <option value="">-- Sin asignar --</option>
+                                                            {empresas.map(emp => (
+                                                                <option key={emp.id} value={emp.id}>{emp.razon_social}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button onClick={() => startEditImpresora(i)} disabled={actionLoading === i.id} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-500/20">
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => handleDeleteImpresora(i.id!)} disabled={actionLoading === i.id} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20">
+                                                            {actionLoading === i.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                        </button>
+                                                    </td>
+                                                </>
+                                            )}
                                         </tr>
                                     ))}
                                     {impresoras.length === 0 && (
-                                        <tr><td colSpan={4} className="text-center py-12 text-slate-500">No hay impresoras registradas en el sistema.</td></tr>
+                                        <tr><td colSpan={4} className="text-center py-12 text-slate-500">No se encontraron impresoras.</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -238,7 +352,7 @@ const InventoryPage: React.FC = () => {
                 // --- TAB: EMPRESAS ---
                 <div className="space-y-8">
                     {/* Formulario Empresa */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-xl shadow-2xl">
+                    <div className="glass-panel p-6 md:p-8 relative overflow-hidden animate-fade-in">
                         <h2 className="text-xl font-semibold mb-6 flex items-center gap-2 text-indigo-300">
                             <Building2 className="w-5 h-5" /> Registrar Empresa
                         </h2>
@@ -247,31 +361,31 @@ const InventoryPage: React.FC = () => {
                                 placeholder="RUT (ej. 12345678-9)"
                                 value={empresaForm.rut}
                                 onChange={e => setEmpresaForm({ ...empresaForm, rut: e.target.value })}
-                                className="w-full md:w-1/4 bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                className="w-full md:w-1/4 bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
                             />
                             <input
                                 placeholder="Razón Social"
                                 value={empresaForm.razon_social}
                                 onChange={e => setEmpresaForm({ ...empresaForm, razon_social: e.target.value })}
-                                className="flex-1 bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                className="flex-1 bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
                             />
                             <input
                                 placeholder="Giro (Opcional)"
                                 value={empresaForm.giro}
                                 onChange={e => setEmpresaForm({ ...empresaForm, giro: e.target.value })}
-                                className="w-full md:w-1/4 bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                className="w-full md:w-1/4 bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
                             />
-                            <button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-medium transition-all flex items-center justify-center">
+                            <button type="submit" disabled={loading} className="bg-primary hover:bg-primary/80 text-primary-foreground px-6 py-3 rounded-xl font-medium transition-all flex items-center justify-center">
                                 {loading && !empresas.length ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Guardar'}
                             </button>
                         </form>
                     </div>
 
                     {/* Tabla Empresas */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-xl shadow-2xl">
+                    <div className="glass-panel overflow-hidden relative animate-fade-in">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left text-slate-300">
-                                <thead className="bg-slate-950/50 border-b border-slate-800 text-slate-400 uppercase text-xs">
+                                <thead className="bg-black/40 border-b border-white/5 text-slate-300 uppercase text-xs">
                                     <tr>
                                         <th className="px-6 py-4">Empresa</th>
                                         <th className="px-6 py-4 text-center">Giro</th>
@@ -281,22 +395,54 @@ const InventoryPage: React.FC = () => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
                                     {empresas.map(e => (
-                                        <tr key={e.id} className="hover:bg-slate-800/30 group transition-colors">
-                                            <td className="px-6 py-4 font-medium text-slate-200">
-                                                {e.razon_social}
-                                                <div className="text-xs text-slate-500 mt-1">RUT: {e.rut}</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center text-slate-400">{e.giro || 'N/A'}</td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1.5 rounded-full font-bold text-xs">
-                                                    {e.cant_equipos || 0} Impresoras
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button onClick={() => handleDeleteEmpresa(e.id!)} disabled={actionLoading === e.id} title="Eliminar Empresa" className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20">
-                                                    {actionLoading === e.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                                </button>
-                                            </td>
+                                        <tr key={e.id} className="hover:bg-white/5 group transition-all duration-300 relative">
+                                            {editEmpresaId === e.id ? (
+                                                <>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col gap-2">
+                                                            <input value={editEmpresaForm.razon_social} onChange={ev => setEditEmpresaForm({...editEmpresaForm, razon_social: ev.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full" placeholder="Razón Social" />
+                                                            <input value={editEmpresaForm.rut} onChange={ev => setEditEmpresaForm({...editEmpresaForm, rut: ev.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-full" placeholder="RUT" />
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <input value={editEmpresaForm.giro} onChange={ev => setEditEmpresaForm({...editEmpresaForm, giro: ev.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full text-center" placeholder="Giro" />
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <span className="text-slate-500 text-xs">-</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex justify-end items-center gap-1">
+                                                            <button onClick={() => saveEditEmpresa(e.id!)} disabled={actionLoading === e.id} className="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors">
+                                                                {actionLoading === e.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                                            </button>
+                                                            <button onClick={() => setEditEmpresaId(null)} disabled={actionLoading === e.id} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <td className="px-6 py-4 font-medium text-slate-200">
+                                                        {e.razon_social}
+                                                        <div className="text-xs text-slate-500 mt-1">RUT: {e.rut}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center text-slate-400">{e.giro || 'N/A'}</td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1.5 rounded-full font-bold text-xs">
+                                                            {e.cant_equipos || 0} Impresoras
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button onClick={() => startEditEmpresa(e)} disabled={actionLoading === e.id} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-500/20">
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => handleDeleteEmpresa(e.id!)} disabled={actionLoading === e.id} title="Eliminar Empresa" className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20">
+                                                            {actionLoading === e.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                        </button>
+                                                    </td>
+                                                </>
+                                            )}
                                         </tr>
                                     ))}
                                     {empresas.length === 0 && (

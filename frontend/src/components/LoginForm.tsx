@@ -28,21 +28,20 @@ export const LoginForm: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-            <div className="fixed inset-0 z-[-1] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950/0 to-slate-950/0 pointer-events-none"></div>
+        <div className="min-h-screen flex items-center justify-center p-4">
             
-            <div className="w-full max-w-md animate-in fade-in zoom-in-95 duration-500">
-                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+            <div className="w-full max-w-md animate-fade-in">
+                <div className="glass-panel p-8 relative overflow-hidden">
                     {/* Decoración */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
-                    <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl -ml-16 -mb-16"></div>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
+                    <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -ml-16 -mb-16"></div>
 
                     <div className="text-center mb-10 relative">
-                        <div className="inline-flex items-center justify-center p-4 bg-indigo-500/10 rounded-2xl mb-6 border border-indigo-500/20 ring-1 ring-indigo-500/30">
-                            <KeyRound className="w-8 h-8 text-indigo-400" />
+                        <div className="inline-flex items-center justify-center p-4 bg-primary/10 rounded-2xl mb-6 border border-primary/20 ring-1 ring-primary/30">
+                            <KeyRound className="w-8 h-8 text-primary" />
                         </div>
-                        <h1 className="text-3xl font-extrabold text-white mb-2 tracking-tight">Acceso Restringido</h1>
-                        <p className="text-slate-400 text-sm">Plataforma Ágil de Gestión Empresarial</p>
+                        <h1 className="text-3xl font-extrabold text-foreground mb-2 tracking-tight">Acceso Restringido</h1>
+                        <p className="text-muted-foreground text-sm">Plataforma Ágil de Gestión Empresarial</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-6 relative">
@@ -55,7 +54,7 @@ export const LoginForm: React.FC = () => {
 
                         <div className="space-y-4">
                             <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-primary transition-colors">
                                     <User className="w-5 h-5" />
                                 </div>
                                 <input
@@ -64,12 +63,12 @@ export const LoginForm: React.FC = () => {
                                     placeholder="Nombre de usuario"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 block pl-12 p-3.5 transition-all outline-none"
+                                    className="w-full bg-black/30 border border-white/5 text-foreground rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary block pl-12 p-3.5 transition-all outline-none"
                                 />
                             </div>
 
                             <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-primary transition-colors">
                                     <KeyRound className="w-5 h-5" />
                                 </div>
                                 <input
@@ -78,7 +77,7 @@ export const LoginForm: React.FC = () => {
                                     placeholder="Contraseña"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 block pl-12 p-3.5 transition-all outline-none"
+                                    className="w-full bg-black/30 border border-white/5 text-foreground rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary block pl-12 p-3.5 transition-all outline-none"
                                 />
                             </div>
                         </div>
@@ -86,7 +85,7 @@ export const LoginForm: React.FC = () => {
                         <button 
                             type="submit" 
                             disabled={isLoading || !username || !password}
-                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white p-3.5 rounded-xl font-semibold transition-all shadow-[0_0_15px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="w-full bg-primary hover:bg-primary/80 text-primary-foreground p-3.5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-primary/50 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Ingresar al Sistema'}
                         </button>

@@ -2,6 +2,7 @@ import logging
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import create_access_token, jwt_required
 from werkzeug.security import check_password_hash
+from sqlalchemy import func, case
 from models import db, Empresa, Impresora, Usuario
 
 # Configurar logs
@@ -142,11 +143,75 @@ def delete_empresa(id):
 @jwt_required()
 def get_impresoras():
     try:
-        logger.info("Obteniendo lista de impresoras")
-        impresoras = Impresora.query.all()
+        logger.info("Obteniendo lista de impresoras filtrada")
+        serial_filter = request.args.get('serial')
+        modelo_filter = request.args.get('modelo')
+        empresa_id_filter = request.args.get('empresa_id')
+
+        query = Impresora.query
+
+        if serial_filter:
+            query = query.filter(Impresora.serial.ilike(f'%{serial_filter}%'))
+        
+        if modelo_filter:
+            query = query.filter(Impresora.modelo == modelo_filter)
+            
+        if empresa_id_filter:
+            if empresa_id_filter == 'unassigned':
+                query = query.filter(Impresora.empresa_id == None)
+            else:
+                query = query.filter(Impresora.empresa_id == empresa_id_filter)
+
+        impresoras = query.all()
         return jsonify([i.to_dict() for i in impresoras])
     except Exception as e:
         logger.error(f"Error en GET /impresoras: {str(e)}")
+        return jsonify({"error": "Error interno del servidor", "details": str(e)}), 500
+
+@api_bp.route('/impresoras/stats', methods=['GET'])
+@jwt_required()
+def get_impresoras_stats():
+    try:
+        logger.info("Obteniendo estadísticas de impresoras")
+        total_equipos = Impresora.query.count()
+        total_disponibles = Impresora.query.filter_by(estado='Disponible').count()
+        
+        stats = db.session.query(
+            Impresora.modelo,
+            func.count(Impresora.id).label('total'),
+            func.sum(case((Impresora.estado == 'Arrendada', 1), else_=0)).label('arrendadas'),
+            func.sum(case((Impresora.estado == 'Disponible', 1), else_=0)).label('disponibles')
+        ).group_by(Impresora.modelo).all()
+        
+        modelos_list = []
+        for s in stats:
+            modelos_list.append({
+                "nombre": s.modelo,
+                "total": s.total,
+                "arrendadas": int(s.arrendadas) if s.arrendadas else 0,
+                "disponibles": int(s.disponibles) if s.disponibles else 0
+            })
+            
+        return jsonify({
+            "total_equipos": total_equipos,
+            "total_disponibles": total_disponibles,
+            "modelos": modelos_list
+        })
+    except Exception as e:
+        logger.error(f"Error en GET /impresoras/stats: {str(e)}")
+        return jsonify({"error": "Error interno del servidor", "details": str(e)}), 500
+
+@api_bp.route('/impresoras/modelos', methods=['GET'])
+@jwt_required()
+def get_modelos():
+    try:
+        logger.info("Obteniendo lista de modelos únicos")
+        # Obtenemos valores únicos de la columna modelo
+        resultado = db.session.query(Impresora.modelo).distinct().all()
+        modelos = [fila[0] for fila in resultado if fila[0]] # desempaquetamos la tupla y filtramos vacíos
+        return jsonify(modelos)
+    except Exception as e:
+        logger.error(f"Error en GET /impresoras/modelos: {str(e)}")
         return jsonify({"error": "Error interno del servidor", "details": str(e)}), 500
 
 @api_bp.route('/impresoras', methods=['POST'])
