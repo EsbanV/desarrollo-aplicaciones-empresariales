@@ -1,7 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { useInventory } from '../hooks/useInventory';
-import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3, Calendar, AlertCircle, Wrench } from 'lucide-react';
+import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3, Calendar, AlertCircle, Wrench, CheckCircle2 } from 'lucide-react';
 import type { Empresa, Impresora } from '../types/inventory';
+
+type MaintenanceIssue = {
+    id: number;
+    label: string;
+    repaired: boolean;
+};
+
+const MAINTENANCE_ISSUES = [
+    'Error de fusión 50.1',
+    'Obstrucción en bandeja 2',
+    'Atasco de papel recurrente',
+    'Sensor óptico descalibrado',
+    'Rodillo de arrastre desgastado',
+    'Falla de tóner y baja densidad',
+    'Error de comunicación de red',
+    'Firmware desactualizado',
+    'Unidad de imagen con desgaste',
+    'Ruido anormal en motor principal',
+    'No enciende',
+    'Imprime con rayas',
+    'Error de escáner',
+    'Problemas de alimentación de papel',
+    'Suelta humos al imprimir',
+    'No esta enchufada',
+    'Le duele la watita',
+];
+
+const pickRandomIssues = (count: number): MaintenanceIssue[] => {
+    const pool = [...MAINTENANCE_ISSUES].sort(() => Math.random() - 0.5);
+    return pool.slice(0, Math.min(count, pool.length)).map((label, index) => ({
+        id: index + 1,
+        label,
+        repaired: false,
+    }));
+};
 
 const InventoryPage: React.FC = () => {
     const {
@@ -11,7 +46,7 @@ const InventoryPage: React.FC = () => {
         fetchImpresoras
     } = useInventory();
 
-    const [activeTab, setActiveTab] = useState<'impresoras' | 'empresas'>('impresoras');
+    const [activeTab, setActiveTab] = useState<'impresoras' | 'empresas' | 'mantenimiento'>('impresoras');
     const [actionLoading, setActionLoading] = useState<number | null>(null);
 
     // Forms states
@@ -37,6 +72,10 @@ const InventoryPage: React.FC = () => {
     const [filterSerial, setFilterSerial] = useState('');
     const [filterModelo, setFilterModelo] = useState('');
     const [filterEmpresa, setFilterEmpresa] = useState('');
+
+    // Maintenance states
+    const [maintenancePrinterId, setMaintenancePrinterId] = useState<number | null>(null);
+    const [maintenanceIssues, setMaintenanceIssues] = useState<MaintenanceIssue[]>([]);
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -282,11 +321,63 @@ const InventoryPage: React.FC = () => {
         { porVencer: 0, vencidos: 0 }
     );
 
+    const outOfServicePrinters = impresoras.filter(
+        (impresora) => impresora.estado === 'Fuera de Servicio' || impresora.estado === 'En Servicio'
+    );
+
+    const selectedMaintenancePrinter = maintenancePrinterId
+        ? impresoras.find((impresora) => impresora.id === maintenancePrinterId)
+        : undefined;
+
+    const repairedCount = maintenanceIssues.filter((issue) => issue.repaired).length;
+    const allIssuesRepaired = maintenanceIssues.length > 0 && repairedCount === maintenanceIssues.length;
+    const progressPercent = maintenanceIssues.length === 0
+        ? 0
+        : Math.round((repairedCount / maintenanceIssues.length) * 100);
+
+    const handleSelectMaintenancePrinter = (value: string) => {
+        const printerId = value ? Number(value) : null;
+        setMaintenancePrinterId(printerId);
+        setMaintenanceIssues(printerId ? pickRandomIssues(3) : []);
+    };
+
+    const handleRepairIssue = (issueId: number) => {
+        setMaintenanceIssues((current) =>
+            current.map((issue) =>
+                issue.id === issueId ? { ...issue, repaired: true } : issue
+            )
+        );
+    };
+
+    const handleDischargePrinter = async () => {
+        if (!selectedMaintenancePrinter?.id || !allIssuesRepaired) return;
+
+        setActionLoading(selectedMaintenancePrinter.id);
+        const result = await updateImpresora(selectedMaintenancePrinter.id, {
+            estado: 'Disponible',
+            empresa_id: null,
+            fecha_inicio: null,
+            fecha_termino: null,
+        });
+
+        if (!result.success) {
+            setFormError(result.message || 'No se pudo dar de alta la impresora');
+        } else {
+            setMaintenancePrinterId(null);
+            setMaintenanceIssues([]);
+        }
+        setActionLoading(null);
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <header className="text-center space-y-3 mb-2">
                 <h1 className="text-3xl md:text-5xl font-extrabold bg-gradient-to-br from-white via-purple-300 to-primary bg-clip-text text-transparent tracking-tight drop-shadow-lg">
-                    {activeTab === 'impresoras' ? 'Inventario de Impresoras' : 'Directorio de Socios'}
+                    {activeTab === 'impresoras'
+                        ? 'Inventario de Impresoras'
+                        : activeTab === 'empresas'
+                            ? 'Empresas'
+                            : 'Mantenimiento Impresora'}
                 </h1>
             </header>
 
@@ -303,6 +394,12 @@ const InventoryPage: React.FC = () => {
                     className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${activeTab === 'empresas' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'bg-black/30 text-slate-400 hover:text-foreground hover:bg-black/50'}`}
                 >
                     <Building2 className="w-5 h-5" /> Empresas
+                </button>
+                <button
+                    onClick={() => setActiveTab('mantenimiento')}
+                    className={`px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all ${activeTab === 'mantenimiento' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25' : 'bg-black/30 text-slate-400 hover:text-foreground hover:bg-black/50'}`}
+                >
+                    <Wrench className="w-5 h-5" /> Mantenimiento
                 </button>
             </div>
 
@@ -616,7 +713,7 @@ const InventoryPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            ) : (
+            ) : activeTab === 'empresas' ? (
                 // --- TAB: EMPRESAS ---
                 <div className="space-y-8">
                     {/* Formulario Empresa */}
@@ -718,6 +815,99 @@ const InventoryPage: React.FC = () => {
                                     )}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                // --- TAB: MANTENIMIENTO ---
+                <div className="space-y-8">
+                    <div className="glass-panel p-6 md:p-8 relative overflow-hidden animate-fade-in">
+                        <h2 className="text-xl font-semibold mb-6 flex items-center gap-2 text-orange-300">
+                            <Wrench className="w-5 h-5" /> Módulo de Diagnóstico y Reparación
+                        </h2>
+
+                        <div className="space-y-5">
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-2">Seleccionar impresora fuera de servicio</label>
+                                <select
+                                    value={maintenancePrinterId || ''}
+                                    onChange={(e) => handleSelectMaintenancePrinter(e.target.value)}
+                                    className="w-full md:w-[520px] bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-orange-500/50 outline-none"
+                                >
+                                    <option value="">-- Seleccionar --</option>
+                                    {outOfServicePrinters.map((printer) => (
+                                        <option key={printer.id} value={printer.id}>
+                                            {printer.modelo} | SN: {printer.serial}
+                                        </option>
+                                    ))}
+                                </select>
+                                {outOfServicePrinters.length === 0 && (
+                                    <p className="text-xs text-slate-500 mt-2">No hay impresoras en estado Fuera de Servicio.</p>
+                                )}
+                            </div>
+
+                            {selectedMaintenancePrinter && (
+                                <div className="space-y-4">
+                                    <div className="p-4 rounded-xl border border-orange-500/20 bg-orange-500/5 text-sm text-slate-300">
+                                        Equipo seleccionado: <span className="text-orange-300 font-semibold">{selectedMaintenancePrinter.modelo}</span> | SN: {selectedMaintenancePrinter.serial}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between text-xs text-slate-400">
+                                            <span>Progreso de reparación</span>
+                                            <span>{progressPercent}%</span>
+                                        </div>
+                                        <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                                            <div
+                                                className="h-full bg-gradient-to-r from-orange-500 to-emerald-400 transition-all duration-300"
+                                                style={{ width: `${progressPercent}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {maintenanceIssues.map((issue) => (
+                                            <div key={issue.id} className="flex items-center justify-between gap-4 p-4 rounded-xl border border-white/5 bg-black/20">
+                                                <div className="flex items-center gap-3">
+                                                    {issue.repaired ? (
+                                                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                                    ) : (
+                                                        <AlertCircle className="w-5 h-5 text-amber-400" />
+                                                    )}
+                                                    <span className={`${issue.repaired ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                                                        {issue.label}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleRepairIssue(issue.id)}
+                                                    disabled={issue.repaired || actionLoading === selectedMaintenancePrinter.id}
+                                                    className="px-3 py-2 rounded-lg text-xs font-semibold border border-emerald-500/20 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                >
+                                                    {issue.repaired ? 'Reparado' : 'Reparar'}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <button
+                                            onClick={handleDischargePrinter}
+                                            disabled={!allIssuesRepaired || actionLoading === selectedMaintenancePrinter.id}
+                                            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            {actionLoading === selectedMaintenancePrinter.id ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <CheckCircle2 className="w-4 h-4" />
+                                            )}
+                                            Dar de Alta
+                                        </button>
+                                        {!allIssuesRepaired && (
+                                            <p className="text-xs text-slate-500 mt-2">Repara todas las fallas para habilitar el alta.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
