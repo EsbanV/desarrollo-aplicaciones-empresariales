@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, date
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import create_access_token, jwt_required
 from werkzeug.security import check_password_hash
@@ -16,6 +17,34 @@ if not logger.handlers:
 
 # Creamos un Blueprint general para la API
 api_bp = Blueprint('api', __name__)
+
+
+def sync_contract_statuses():
+    """Sincroniza estado de contrato segun fecha_termino.
+    - Vencido: fecha_termino menor a hoy
+    - Arrendada: fecha_termino hoy o futura
+    """
+    today = date.today()
+    changed = False
+
+    impresoras_contrato = Impresora.query.filter(
+        Impresora.empresa_id.isnot(None),
+        Impresora.fecha_termino.isnot(None)
+    ).all()
+
+    for impresora in impresoras_contrato:
+        try:
+            end_date = datetime.strptime(impresora.fecha_termino, '%Y-%m-%d').date()
+        except (TypeError, ValueError):
+            continue
+
+        new_status = 'Vencido' if end_date < today else 'Arrendada'
+        if impresora.estado != new_status:
+            impresora.estado = new_status
+            changed = True
+
+    if changed:
+        db.session.commit()
 
 # ==========================================
 # RUTAS DE AUTENTICACIÓN
@@ -145,6 +174,7 @@ def delete_empresa(id):
 @jwt_required()
 def get_impresoras():
     try:
+        sync_contract_statuses()
         logger.info("Obteniendo lista de impresoras filtrada")
         serial_filter = request.args.get('serial')
         modelo_filter = request.args.get('modelo')
@@ -174,15 +204,20 @@ def get_impresoras():
 @jwt_required()
 def get_impresoras_stats():
     try:
+        sync_contract_statuses()
         logger.info("Obteniendo estadísticas de impresoras")
         total_equipos = Impresora.query.count()
         total_disponibles = Impresora.query.filter_by(estado='Disponible').count()
+        total_en_servicio = Impresora.query.filter(
+            Impresora.estado.in_(['Fuera de Servicio', 'En Servicio'])
+        ).count()
         
         stats = db.session.query(
             Impresora.modelo,
             func.count(Impresora.id).label('total'),
             func.sum(case((Impresora.estado == 'Arrendada', 1), else_=0)).label('arrendadas'),
-            func.sum(case((Impresora.estado == 'Disponible', 1), else_=0)).label('disponibles')
+            func.sum(case((Impresora.estado == 'Disponible', 1), else_=0)).label('disponibles'),
+            func.sum(case((Impresora.estado.in_(['Fuera de Servicio', 'En Servicio']), 1), else_=0)).label('en_servicio')
         ).group_by(Impresora.modelo).all()
         
         modelos_list = []
@@ -191,12 +226,14 @@ def get_impresoras_stats():
                 "nombre": s.modelo,
                 "total": s.total,
                 "arrendadas": int(s.arrendadas) if s.arrendadas else 0,
-                "disponibles": int(s.disponibles) if s.disponibles else 0
+                "disponibles": int(s.disponibles) if s.disponibles else 0,
+                "en_servicio": int(s.en_servicio) if s.en_servicio else 0
             })
             
         return jsonify({
             "total_equipos": total_equipos,
             "total_disponibles": total_disponibles,
+            "total_en_servicio": total_en_servicio,
             "modelos": modelos_list
         })
     except Exception as e:
@@ -261,6 +298,24 @@ def update_impresora(id):
             impresora.serial = data['serial']
         if 'modelo' in data:
             impresora.modelo = data['modelo']
+        new_estado = data.get('estado', impresora.estado)
+        new_empresa_id = data.get('empresa_id', impresora.empresa_id)
+
+        is_out_of_service = new_estado in ['Fuera de Servicio', 'En Servicio']
+
+        # Regla de negocio: un equipo fuera de servicio no puede estar asignado.
+        if is_out_of_service and new_empresa_id is not None:
+            return jsonify({"error": "Una impresora fuera de servicio no puede estar asignada a una empresa"}), 400
+
+        # Regla de negocio: no se puede asignar una impresora fuera de servicio.
+        if is_out_of_service and 'empresa_id' in data and data.get('empresa_id') is not None:
+            return jsonify({"error": "No puedes arrendar una impresora fuera de servicio"}), 400
+
+        # Normaliza el nombre de estado para mantener consistencia.
+        if new_estado == 'En Servicio':
+            new_estado = 'Fuera de Servicio'
+            data['estado'] = 'Fuera de Servicio'
+
         if 'estado' in data:
             impresora.estado = data['estado']
         if 'fecha_inicio' in data:
@@ -271,6 +326,12 @@ def update_impresora(id):
             impresora.valor_arriendo = data['valor_arriendo']
         if 'empresa_id' in data:
             impresora.empresa_id = data['empresa_id']
+
+        # Si pasa a fuera de servicio, se limpia contrato y asignacion automaticamente.
+        if new_estado == 'Fuera de Servicio':
+            impresora.empresa_id = None
+            impresora.fecha_inicio = None
+            impresora.fecha_termino = None
 
         db.session.commit()
         return jsonify(impresora.to_dict()), 200

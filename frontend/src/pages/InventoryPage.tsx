@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useInventory } from '../hooks/useInventory';
-import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3, Calendar, AlertCircle } from 'lucide-react';
+import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3, Calendar, AlertCircle, Wrench } from 'lucide-react';
 import type { Empresa, Impresora } from '../types/inventory';
 
 const InventoryPage: React.FC = () => {
@@ -105,7 +105,7 @@ const InventoryPage: React.FC = () => {
         const today = new Date();
         const fechaInicio = today.toISOString().slice(0, 10);
         const fechaTerminoDate = new Date(today);
-        fechaTerminoDate.setFullYear(fechaTerminoDate.getFullYear() + 1);
+        fechaTerminoDate.setMonth(fechaTerminoDate.getMonth() + 6);
         const fechaTermino = fechaTerminoDate.toISOString().slice(0, 10);
 
         await updateImpresora(impresoraId, {
@@ -157,6 +157,54 @@ const InventoryPage: React.FC = () => {
         setActionLoading(null);
     };
 
+    const handleRenewContract = async (impresoraId: number) => {
+        const currentPrinter = impresoras.find((impresora) => impresora.id === impresoraId);
+        if (!currentPrinter) return;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const currentEndDate = currentPrinter.fecha_termino
+            ? new Date(`${currentPrinter.fecha_termino}T00:00:00`)
+            : null;
+
+        let renewalBaseDate = today;
+        if (currentEndDate && !Number.isNaN(currentEndDate.getTime()) && currentEndDate > today) {
+            renewalBaseDate = currentEndDate;
+        }
+
+        const renewedEndDate = new Date(renewalBaseDate);
+        renewedEndDate.setMonth(renewedEndDate.getMonth() + 6);
+
+        setActionLoading(impresoraId);
+        const result = await updateImpresora(impresoraId, {
+            estado: 'Arrendada',
+            fecha_inicio: currentPrinter.fecha_inicio || today.toISOString().slice(0, 10),
+            fecha_termino: renewedEndDate.toISOString().slice(0, 10),
+        });
+        if (!result.success) {
+            setFormError(result.message || 'No se pudo renovar el contrato');
+        }
+        setActionLoading(null);
+    };
+
+    const handleToggleService = async (impresoraId: number) => {
+        const currentPrinter = impresoras.find((impresora) => impresora.id === impresoraId);
+        if (!currentPrinter) return;
+
+        setActionLoading(impresoraId);
+        const isOutOfService = currentPrinter.estado === 'Fuera de Servicio' || currentPrinter.estado === 'En Servicio';
+
+        const result = await updateImpresora(impresoraId, {
+            estado: isOutOfService ? 'Disponible' : 'Fuera de Servicio',
+        });
+
+        if (!result.success) {
+            setFormError(result.message || 'No se pudo cambiar el estado de servicio');
+        }
+        setActionLoading(null);
+    };
+
     const formatDate = (dateString?: string | null) => {
         if (!dateString) return 'Sin fecha';
         const date = new Date(`${dateString}T00:00:00`);
@@ -165,7 +213,7 @@ const InventoryPage: React.FC = () => {
     };
 
     const getContractBadge = (estado?: string, fechaTermino?: string | null) => {
-        if (estado !== 'Arrendada') {
+        if (estado !== 'Arrendada' && estado !== 'Vencido') {
             return null;
         }
 
@@ -209,6 +257,31 @@ const InventoryPage: React.FC = () => {
         };
     };
 
+    const contractAlerts = impresoras.reduce(
+        (acc, impresora) => {
+            if (!impresora.empresa_id || !impresora.fecha_termino) {
+                return acc;
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const end = new Date(`${impresora.fecha_termino}T00:00:00`);
+            if (Number.isNaN(end.getTime())) {
+                return acc;
+            }
+
+            const daysDiff = Math.floor((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysDiff < 0) {
+                acc.vencidos += 1;
+            } else if (daysDiff <= 15) {
+                acc.porVencer += 1;
+            }
+
+            return acc;
+        },
+        { porVencer: 0, vencidos: 0 }
+    );
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             <header className="text-center space-y-3 mb-2">
@@ -243,6 +316,21 @@ const InventoryPage: React.FC = () => {
             {activeTab === 'impresoras' ? (
                 // --- TAB: IMPRESORAS ---
                 <div className="space-y-8">
+                    {(contractAlerts.porVencer > 0 || contractAlerts.vencidos > 0) && (
+                        <div className="glass-panel p-4 md:p-5 border border-white/10">
+                            <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
+                                <div className="inline-flex items-center gap-2 text-amber-400 text-sm font-medium">
+                                    <AlertCircle className="w-4 h-4" />
+                                    Por vencer: {contractAlerts.porVencer}
+                                </div>
+                                <div className="inline-flex items-center gap-2 text-red-400 text-sm font-medium">
+                                    <AlertCircle className="w-4 h-4" />
+                                    Vencidos: {contractAlerts.vencidos}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Panel de Estadísticas Globales */}
                     {stats && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
@@ -268,19 +356,21 @@ const InventoryPage: React.FC = () => {
                                                 <th className="px-3 py-2 text-center">Total</th>
                                                 <th className="px-3 py-2 text-center">Arrend.</th>
                                                 <th className="px-3 py-2 text-center">Disp.</th>
+                                                <th className="px-3 py-2 text-center">Serv.</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-border/30">
-                                            {stats.modelos.map((m: { nombre: string; total: number; arrendadas: number; disponibles: number }, idx: number) => (
+                                            {stats.modelos.map((m: { nombre: string; total: number; arrendadas: number; disponibles: number; en_servicio?: number }, idx: number) => (
                                                 <tr key={idx} className="hover:bg-muted/20 transition-colors">
                                                     <td className="px-3 py-2 font-medium text-foreground">{m.nombre}</td>
                                                     <td className="px-3 py-2 text-center">{m.total}</td>
                                                     <td className="px-3 py-2 text-center text-accent font-semibold">{m.arrendadas}</td>
                                                     <td className="px-3 py-2 text-center text-primary font-semibold">{m.disponibles}</td>
+                                                    <td className="px-3 py-2 text-center text-orange-400 font-semibold">{m.en_servicio || 0}</td>
                                                 </tr>
                                             ))}
                                             {stats.modelos.length === 0 && (
-                                                <tr><td colSpan={4} className="text-center py-4 text-muted-foreground">No hay datos.</td></tr>
+                                                <tr><td colSpan={5} className="text-center py-4 text-muted-foreground">No hay datos.</td></tr>
                                             )}
                                         </tbody>
                                     </table>
@@ -390,9 +480,10 @@ const InventoryPage: React.FC = () => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
                                     {impresoras.map(i => {
+                                        const isOutOfService = i.estado === 'Fuera de Servicio' || i.estado === 'En Servicio';
                                         const contractBadge = getContractBadge(i.estado, i.fecha_termino);
                                         return (
-                                        <tr key={i.id} className="hover:bg-white/5 group transition-all duration-300 relative">
+                                        <tr key={i.id} className={`hover:bg-white/5 group transition-all duration-300 relative ${isOutOfService ? 'opacity-65' : ''}`}>
                                             {editImpresoraId === i.id ? (
                                                 <>
                                                     <td className="px-6 py-4">
@@ -444,8 +535,8 @@ const InventoryPage: React.FC = () => {
                                                         <div className="text-xs text-slate-500 mt-1">SN: {i.serial} | Arriendo: ${i.valor_arriendo}/mes</div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${i.estado === 'Disponible' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
-                                                            {i.estado}
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${i.estado === 'Disponible' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : i.estado === 'Vencido' ? 'bg-red-500/10 text-red-400 border-red-500/20' : isOutOfService ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                                                            {isOutOfService ? 'Fuera de Servicio' : i.estado}
                                                         </span>
                                                         {contractBadge && (
                                                             <div className="mt-2 flex justify-center">
@@ -457,7 +548,7 @@ const InventoryPage: React.FC = () => {
                                                         )}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        {i.estado === 'Arrendada' ? (
+                                                        {i.estado === 'Arrendada' || i.estado === 'Vencido' ? (
                                                             <div className="space-y-1 text-xs text-slate-300">
                                                                 <div className="inline-flex items-center gap-2">
                                                                     <Calendar className="w-3.5 h-3.5 text-indigo-300" />
@@ -477,7 +568,8 @@ const InventoryPage: React.FC = () => {
                                                             value={i.empresa_id || ''}
                                                             onChange={(e) => handleAssign(i.id!, e.target.value)}
                                                             className="bg-black/50 border border-white/10 text-slate-300 text-sm rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition-colors cursor-pointer w-full max-w-[200px]"
-                                                            disabled={actionLoading === i.id}
+                                                            disabled={actionLoading === i.id || isOutOfService}
+                                                            title={isOutOfService ? 'No se puede asignar mientras esté fuera de servicio' : 'Asignar empresa'}
                                                         >
                                                             <option value="">-- Sin asignar --</option>
                                                             {empresas.map(emp => (
@@ -486,6 +578,24 @@ const InventoryPage: React.FC = () => {
                                                         </select>
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
+                                                        <button
+                                                            onClick={() => handleToggleService(i.id!)}
+                                                            disabled={actionLoading === i.id}
+                                                            className={`p-2 rounded-lg transition-colors border border-transparent ${isOutOfService ? 'text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 hover:border-orange-500/20' : 'text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 hover:border-orange-500/20'}`}
+                                                            title={isOutOfService ? 'Marcar como Disponible' : 'Marcar como Fuera de Servicio'}
+                                                        >
+                                                            <Wrench className="w-4 h-4" />
+                                                        </button>
+                                                        {(i.estado === 'Arrendada' || i.estado === 'Vencido') && i.empresa_id && (
+                                                            <button
+                                                                onClick={() => handleRenewContract(i.id!)}
+                                                                disabled={actionLoading === i.id}
+                                                                className="p-2 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors border border-transparent hover:border-emerald-500/20"
+                                                                title="Renovar contrato 6 meses"
+                                                            >
+                                                                <Calendar className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                         <button onClick={() => startEditImpresora(i)} disabled={actionLoading === i.id} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-500/20">
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
