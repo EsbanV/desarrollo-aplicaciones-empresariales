@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useInventory } from '../hooks/useInventory';
-<<<<<<< HEAD
-import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3 } from 'lucide-react';
-=======
-import { Building2, Printer, Plus, Trash2, Loader2, Calendar, AlertCircle } from 'lucide-react';
->>>>>>> 768623d400fc4b5c28ef9ce4e4450cb6da13f4eb
+import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3, Calendar, AlertCircle } from 'lucide-react';
 
 const InventoryPage: React.FC = () => {
     const {
@@ -19,17 +15,21 @@ const InventoryPage: React.FC = () => {
 
     // Forms states
     const [empresaForm, setEmpresaForm] = useState({ rut: '', razon_social: '', giro: '' });
-<<<<<<< HEAD
-    const [impresoraForm, setImpresoraForm] = useState({ serial: '', modelo: '', valor_arriendo: '' as number | string });
+    const [impresoraForm, setImpresoraForm] = useState({
+        serial: '',
+        modelo: '',
+        valor_arriendo: '' as number | string
+    });
 
     const [formError, setFormError] = useState<string | null>(null);
 
     // Edit states
     const [editImpresoraId, setEditImpresoraId] = useState<number | null>(null);
-    const [editImpresoraForm, setEditImpresoraForm] = useState({ serial: '', modelo: '', valor_arriendo: 0 });
+    const [editImpresoraForm, setEditImpresoraForm] = useState({ serial: '', modelo: '', valor_arriendo: 0, fecha_inicio: '', fecha_termino: '' });
 
     const [editEmpresaId, setEditEmpresaId] = useState<number | null>(null);
     const [editEmpresaForm, setEditEmpresaForm] = useState({ rut: '', razon_social: '', giro: '' });
+
     // Filter states
     const [filterSerial, setFilterSerial] = useState('');
     const [filterModelo, setFilterModelo] = useState('');
@@ -45,17 +45,6 @@ const InventoryPage: React.FC = () => {
         }, 500);
         return () => clearTimeout(timeoutId);
     }, [filterSerial, filterModelo, filterEmpresa, fetchImpresoras]);
-=======
-    const [impresoraForm, setImpresoraForm] = useState({
-        serial: '',
-        modelo: '',
-        valor_arriendo: 0,
-        fecha_inicio: '',
-        fecha_termino: ''
-    });
-
-    const [formError, setFormError] = useState<string | null>(null);
->>>>>>> 768623d400fc4b5c28ef9ce4e4450cb6da13f4eb
 
     const handleAddEmpresa = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -76,22 +65,9 @@ const InventoryPage: React.FC = () => {
             setFormError('Serial y Modelo son obligatorios');
             return;
         }
-<<<<<<< HEAD
         const dataToSend = { ...impresoraForm, valor_arriendo: impresoraForm.valor_arriendo === '' ? 0 : Number(impresoraForm.valor_arriendo) };
         const res = await addImpresora(dataToSend);
         if (res.success) setImpresoraForm({ serial: '', modelo: '', valor_arriendo: '' });
-=======
-        const res = await addImpresora(impresoraForm);
-        if (res.success) {
-            setImpresoraForm({
-                serial: '',
-                modelo: '',
-                valor_arriendo: 0,
-                fecha_inicio: '',
-                fecha_termino: ''
-            });
-        }
->>>>>>> 768623d400fc4b5c28ef9ce4e4450cb6da13f4eb
         else setFormError(res.message!);
     };
 
@@ -133,18 +109,38 @@ const InventoryPage: React.FC = () => {
         setActionLoading(null);
     };
 
-<<<<<<< HEAD
     const startEditImpresora = (i: any) => {
         setEditImpresoraId(i.id);
-        setEditImpresoraForm({ serial: i.serial, modelo: i.modelo, valor_arriendo: i.valor_arriendo || 0 });
+        setEditImpresoraForm({ 
+            serial: i.serial, 
+            modelo: i.modelo, 
+            valor_arriendo: i.valor_arriendo || 0,
+            fecha_inicio: i.fecha_inicio || '',
+            fecha_termino: i.fecha_termino || ''
+        });
     };
+
     const saveEditImpresora = async (id: number) => {
         setActionLoading(id);
         const res = await updateImpresora(id, editImpresoraForm);
         if (res.success) setEditImpresoraId(null);
         else setFormError(res.message!);
         setActionLoading(null);
-=======
+    };
+
+    const startEditEmpresa = (e: any) => {
+        setEditEmpresaId(e.id);
+        setEditEmpresaForm({ rut: e.rut, razon_social: e.razon_social, giro: e.giro || '' });
+    };
+
+    const saveEditEmpresa = async (id: number) => {
+        setActionLoading(id);
+        const res = await updateEmpresa(id, editEmpresaForm);
+        if (res.success) setEditEmpresaId(null);
+        else setFormError(res.message!);
+        setActionLoading(null);
+    };
+
     const formatDate = (dateString?: string | null) => {
         if (!dateString) return 'Sin fecha';
         const date = new Date(`${dateString}T00:00:00`);
@@ -195,21 +191,7 @@ const InventoryPage: React.FC = () => {
             label: 'Vigente',
             className: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
         };
->>>>>>> 768623d400fc4b5c28ef9ce4e4450cb6da13f4eb
     };
-
-    const startEditEmpresa = (e: any) => {
-        setEditEmpresaId(e.id);
-        setEditEmpresaForm({ rut: e.rut, razon_social: e.razon_social, giro: e.giro || '' });
-    };
-    const saveEditEmpresa = async (id: number) => {
-        setActionLoading(id);
-        const res = await updateEmpresa(id, editEmpresaForm);
-        if (res.success) setEditEmpresaId(null);
-        else setFormError(res.message!);
-        setActionLoading(null);
-    };
-
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -319,31 +301,7 @@ const InventoryPage: React.FC = () => {
                                     className="w-full bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/50 outline-none"
                                 />
                             </div>
-<<<<<<< HEAD
-                            <button type="submit" disabled={loading} className="bg-primary hover:bg-primary/80 text-primary-foreground px-6 py-3 rounded-xl font-medium transition-all flex items-center justify-center">
-=======
-                            <div className="flex-1 relative">
-                                <label className="absolute -top-2.5 left-3 text-xs bg-slate-900 px-1 text-slate-400">Desde</label>
-                                <input
-                                    type="date"
-                                    value={impresoraForm.fecha_inicio}
-                                    onChange={e => setImpresoraForm({ ...impresoraForm, fecha_inicio: e.target.value })}
-                                    className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
-                                    title="Fecha de inicio"
-                                />
-                            </div>
-                            <div className="flex-1 relative">
-                                <label className="absolute -top-2.5 left-3 text-xs bg-slate-900 px-1 text-slate-400">Hasta</label>
-                                <input
-                                    type="date"
-                                    value={impresoraForm.fecha_termino}
-                                    onChange={e => setImpresoraForm({ ...impresoraForm, fecha_termino: e.target.value })}
-                                    className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
-                                    title="Fecha de término"
-                                />
-                            </div>
                             <button type="submit" disabled={loading} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-medium transition-all flex items-center justify-center">
->>>>>>> 768623d400fc4b5c28ef9ce4e4450cb6da13f4eb
                                 {loading && !impresoras.length ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Guardar'}
                             </button>
                         </form>
@@ -397,22 +355,39 @@ const InventoryPage: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
-                                    {impresoras.map(i => (
-<<<<<<< HEAD
+                                    {impresoras.map(i => {
+                                        const contractBadge = getContractBadge(i.estado, i.fecha_termino);
+                                        return (
                                         <tr key={i.id} className="hover:bg-white/5 group transition-all duration-300 relative">
                                             {editImpresoraId === i.id ? (
                                                 <>
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col gap-2">
-                                                            <input value={editImpresoraForm.modelo} onChange={e => setEditImpresoraForm({...editImpresoraForm, modelo: e.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full" placeholder="Modelo" />
+                                                            <input value={editImpresoraForm.modelo} onChange={e => setEditImpresoraForm({ ...editImpresoraForm, modelo: e.target.value })} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full" placeholder="Modelo" />
                                                             <div className="flex gap-2">
-                                                                <input value={editImpresoraForm.serial} onChange={e => setEditImpresoraForm({...editImpresoraForm, serial: e.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-1/2" placeholder="Serial" />
-                                                                <input type="number" value={editImpresoraForm.valor_arriendo} onChange={e => setEditImpresoraForm({...editImpresoraForm, valor_arriendo: parseInt(e.target.value)||0})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-1/2" placeholder="$ Arriendo" />
+                                                                <input value={editImpresoraForm.serial} onChange={e => setEditImpresoraForm({ ...editImpresoraForm, serial: e.target.value })} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-1/2" placeholder="Serial" />
+                                                                <input type="number" value={editImpresoraForm.valor_arriendo} onChange={e => setEditImpresoraForm({ ...editImpresoraForm, valor_arriendo: parseInt(e.target.value) || 0 })} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-1/2" placeholder="$ Arriendo" />
                                                             </div>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
                                                         <span className="text-slate-500 text-xs">-</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {i.estado === 'Arrendada' ? (
+                                                            <div className="flex flex-col gap-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-xs text-slate-500 w-12 text-right">Inicio:</span>
+                                                                    <input type="date" value={editImpresoraForm.fecha_inicio} onChange={e => setEditImpresoraForm({...editImpresoraForm, fecha_inicio: e.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-full" />
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-xs text-slate-500 w-12 text-right">Término:</span>
+                                                                    <input type="date" value={editImpresoraForm.fecha_termino} onChange={e => setEditImpresoraForm({...editImpresoraForm, fecha_termino: e.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-full" />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-slate-500 text-xs block text-center">-</span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <span className="text-slate-500 text-xs block text-center">-</span>
@@ -438,6 +413,30 @@ const InventoryPage: React.FC = () => {
                                                         <span className={`px-3 py-1 rounded-full text-xs font-bold border ${i.estado === 'Disponible' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
                                                             {i.estado}
                                                         </span>
+                                                        {contractBadge && (
+                                                            <div className="mt-2 flex justify-center">
+                                                                <span className={`px-3 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 ${contractBadge.className}`}>
+                                                                    <AlertCircle className="w-3.5 h-3.5" />
+                                                                    {contractBadge.label}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {i.estado === 'Arrendada' ? (
+                                                            <div className="space-y-1 text-xs text-slate-300">
+                                                                <div className="inline-flex items-center gap-2">
+                                                                    <Calendar className="w-3.5 h-3.5 text-indigo-300" />
+                                                                    <span>Inicio: {formatDate(i.fecha_inicio)}</span>
+                                                                </div>
+                                                                <div className="inline-flex items-center gap-2">
+                                                                    <Calendar className="w-3.5 h-3.5 text-indigo-300" />
+                                                                    <span>Término: {formatDate(i.fecha_termino)}</span>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-500">Sin contrato</span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <select
@@ -462,73 +461,11 @@ const InventoryPage: React.FC = () => {
                                                     </td>
                                                 </>
                                             )}
-=======
-                                        (() => {
-                                            const contractBadge = getContractBadge(i.estado, i.fecha_termino);
-                                            return (
-                                        <tr key={i.id} className="hover:bg-slate-800/30 group transition-colors">
-                                            <td className="px-6 py-4 font-medium text-slate-200">
-                                                {i.modelo}
-                                                <div className="text-xs text-slate-500 mt-1">SN: {i.serial} | Arriendo: ${i.valor_arriendo}/mes</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold border ${i.estado === 'Disponible' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
-                                                    {i.estado}
-                                                </span>
-                                                {contractBadge && (
-                                                    <div className="mt-2 flex justify-center">
-                                                        <span className={`px-3 py-1 rounded-full text-xs font-bold border inline-flex items-center gap-1 ${contractBadge.className}`}>
-                                                            <AlertCircle className="w-3.5 h-3.5" />
-                                                            {contractBadge.label}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {i.estado === 'Arrendada' ? (
-                                                    <div className="space-y-1 text-xs text-slate-300">
-                                                        <div className="inline-flex items-center gap-2">
-                                                            <Calendar className="w-3.5 h-3.5 text-indigo-300" />
-                                                            <span>Inicio: {formatDate(i.fecha_inicio)}</span>
-                                                        </div>
-                                                        <div className="inline-flex items-center gap-2">
-                                                            <Calendar className="w-3.5 h-3.5 text-indigo-300" />
-                                                            <span>Término: {formatDate(i.fecha_termino)}</span>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-slate-500">Sin contrato</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <select
-                                                    value={i.empresa_id || ''}
-                                                    onChange={(e) => handleAssign(i.id!, e.target.value)}
-                                                    className="bg-slate-950 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition-colors cursor-pointer w-full max-w-[200px]"
-                                                    disabled={actionLoading === i.id}
-                                                >
-                                                    <option value="">-- Sin asignar --</option>
-                                                    {empresas.map(emp => (
-                                                        <option key={emp.id} value={emp.id}>{emp.razon_social}</option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button onClick={() => handleDeleteImpresora(i.id!)} disabled={actionLoading === i.id} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20">
-                                                    {actionLoading === i.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                                </button>
-                                            </td>
->>>>>>> 768623d400fc4b5c28ef9ce4e4450cb6da13f4eb
                                         </tr>
-                                            );
-                                        })()
-                                    ))}
+                                        );
+                                    })}
                                     {impresoras.length === 0 && (
-<<<<<<< HEAD
-                                        <tr><td colSpan={4} className="text-center py-12 text-slate-500">No se encontraron impresoras.</td></tr>
-=======
-                                        <tr><td colSpan={5} className="text-center py-12 text-slate-500">No hay impresoras registradas en el sistema.</td></tr>
->>>>>>> 768623d400fc4b5c28ef9ce4e4450cb6da13f4eb
+                                        <tr><td colSpan={5} className="text-center py-12 text-slate-500">No se encontraron impresoras.</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -587,12 +524,12 @@ const InventoryPage: React.FC = () => {
                                                 <>
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col gap-2">
-                                                            <input value={editEmpresaForm.razon_social} onChange={ev => setEditEmpresaForm({...editEmpresaForm, razon_social: ev.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full" placeholder="Razón Social" />
-                                                            <input value={editEmpresaForm.rut} onChange={ev => setEditEmpresaForm({...editEmpresaForm, rut: ev.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-full" placeholder="RUT" />
+                                                            <input value={editEmpresaForm.razon_social} onChange={ev => setEditEmpresaForm({ ...editEmpresaForm, razon_social: ev.target.value })} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full" placeholder="Razón Social" />
+                                                            <input value={editEmpresaForm.rut} onChange={ev => setEditEmpresaForm({ ...editEmpresaForm, rut: ev.target.value })} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-full" placeholder="RUT" />
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        <input value={editEmpresaForm.giro} onChange={ev => setEditEmpresaForm({...editEmpresaForm, giro: ev.target.value})} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full text-center" placeholder="Giro" />
+                                                        <input value={editEmpresaForm.giro} onChange={ev => setEditEmpresaForm({ ...editEmpresaForm, giro: ev.target.value })} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full text-center" placeholder="Giro" />
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
                                                         <span className="text-slate-500 text-xs">-</span>
