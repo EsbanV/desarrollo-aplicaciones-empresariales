@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useInventory } from '../hooks/useInventory';
-import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3, Calendar, AlertCircle, Wrench, CheckCircle2 } from 'lucide-react';
+import { Building2, Printer, Plus, Trash2, Loader2, Edit2, Check, X, BarChart3, Calendar, AlertCircle, Wrench, CheckCircle2, Unlink2 } from 'lucide-react';
 import type { Empresa, Impresora } from '../types/inventory';
 
 type MaintenanceIssue = {
@@ -38,10 +38,42 @@ const pickRandomIssues = (count: number): MaintenanceIssue[] => {
     }));
 };
 
+const normalizeRutInput = (value: string) => {
+    const cleaned = value.replace(/[.\-\s]/g, '').trim().toUpperCase();
+    if (cleaned.length < 2) return value.trim();
+
+    const body = cleaned.slice(0, -1);
+    const dv = cleaned.slice(-1);
+    if (!/^\d+$/.test(body) || !/^[\dkK]$/.test(dv)) return value.trim();
+
+    return `${body}-${dv}`;
+};
+
+const getContractState = (printer: Impresora) => {
+    if (!printer.empresa_id) {
+        return 'Disponible';
+    }
+
+    if (!printer.fecha_termino) {
+        return 'Arrendada';
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(`${printer.fecha_termino}T00:00:00`);
+
+    if (Number.isNaN(endDate.getTime())) {
+        return 'Arrendada';
+    }
+
+    return endDate < today ? 'Vencido' : 'Arrendada';
+};
+
 const InventoryPage: React.FC = () => {
     const {
         empresas, impresoras, modelosDisponibles, stats, loading, error,
         addEmpresa, deleteEmpresa, updateEmpresa,
+        detachEmpresaActivos,
         addImpresora, deleteImpresora, updateImpresora,
         fetchImpresoras
     } = useInventory();
@@ -60,13 +92,16 @@ const InventoryPage: React.FC = () => {
     });
 
     const [formError, setFormError] = useState<string | null>(null);
+    const [dismissedError, setDismissedError] = useState<string | null>(null);
 
     // Edit states
     const [editImpresoraId, setEditImpresoraId] = useState<number | null>(null);
     const [editImpresoraForm, setEditImpresoraForm] = useState({ serial: '', modelo: '', valor_arriendo: 0, fecha_inicio: '', fecha_termino: '' });
+    const [confirmDeletePrinterId, setConfirmDeletePrinterId] = useState<number | null>(null);
 
     const [editEmpresaId, setEditEmpresaId] = useState<number | null>(null);
     const [editEmpresaForm, setEditEmpresaForm] = useState({ rut: '', razon_social: '', giro: '' });
+    const [confirmDeleteEmpresaId, setConfirmDeleteEmpresaId] = useState<number | null>(null);
 
     // Filter states
     const [filterSerial, setFilterSerial] = useState('');
@@ -76,6 +111,9 @@ const InventoryPage: React.FC = () => {
     // Maintenance states
     const [maintenancePrinterId, setMaintenancePrinterId] = useState<number | null>(null);
     const [maintenanceIssues, setMaintenanceIssues] = useState<MaintenanceIssue[]>([]);
+
+    const activeErrorMessage = formError || error;
+    const visibleErrorMessage = activeErrorMessage && dismissedError !== activeErrorMessage ? activeErrorMessage : null;
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -91,11 +129,15 @@ const InventoryPage: React.FC = () => {
     const handleAddEmpresa = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError(null);
+        setDismissedError(null);
         if (!empresaForm.rut || !empresaForm.razon_social) {
             setFormError('RUT y Razón Social son obligatorios');
             return;
         }
-        const res = await addEmpresa(empresaForm);
+        const res = await addEmpresa({
+            ...empresaForm,
+            rut: normalizeRutInput(empresaForm.rut),
+        });
         if (res.success) setEmpresaForm({ rut: '', razon_social: '', giro: '' });
         else setFormError(res.message!);
     };
@@ -103,6 +145,7 @@ const InventoryPage: React.FC = () => {
     const handleAddImpresora = async (e: React.FormEvent) => {
         e.preventDefault();
         setFormError(null);
+        setDismissedError(null);
         if (!impresoraForm.serial || !impresoraForm.modelo) {
             setFormError('Serial y Modelo son obligatorios');
             return;
@@ -128,12 +171,46 @@ const InventoryPage: React.FC = () => {
         setActionLoading(id);
         await deleteEmpresa(id);
         setActionLoading(null);
+        setConfirmDeleteEmpresaId(null);
+    };
+
+    const openDeleteEmpresaConfirm = (id: number, cantEquipos?: number) => {
+        if ((cantEquipos || 0) > 0) {
+            setConfirmDeleteEmpresaId(null);
+            setFormError('No se puede eliminar esta empresa porque tiene impresoras asignadas. Primero debes desligarlas.');
+            setDismissedError(null);
+            return;
+        }
+
+        setConfirmDeleteEmpresaId(id);
+    };
+
+    const cancelDeleteEmpresa = () => {
+        if (actionLoading !== null) return;
+        setConfirmDeleteEmpresaId(null);
     };
 
     const handleDeleteImpresora = async (id: number) => {
         setActionLoading(id);
         await deleteImpresora(id);
         setActionLoading(null);
+        setConfirmDeletePrinterId(null);
+    };
+
+    const openDeletePrinterConfirm = (id: number, empresaId?: number | null) => {
+        if (empresaId) {
+            setConfirmDeletePrinterId(null);
+            setFormError('No se puede eliminar la impresora porque tiene una empresa asignada. Primero debes desligarla.');
+            setDismissedError(null);
+            return;
+        }
+
+        setConfirmDeletePrinterId(id);
+    };
+
+    const cancelDeletePrinter = () => {
+        if (actionLoading !== null) return;
+        setConfirmDeletePrinterId(null);
     };
 
     const handleAssign = async (impresoraId: number, empresaId: string) => {
@@ -188,11 +265,27 @@ const InventoryPage: React.FC = () => {
         setEditEmpresaForm({ rut: e.rut, razon_social: e.razon_social, giro: e.giro || '' });
     };
 
+    const handleDetachEmpresaActivos = async (id: number) => {
+        setActionLoading(id);
+        const res = await detachEmpresaActivos(id);
+        if (!res.success) {
+            setFormError(res.message!);
+            setDismissedError(null);
+        }
+        setActionLoading(null);
+    };
+
     const saveEditEmpresa = async (id: number) => {
         setActionLoading(id);
-        const res = await updateEmpresa(id, editEmpresaForm);
+        const res = await updateEmpresa(id, {
+            ...editEmpresaForm,
+            rut: normalizeRutInput(editEmpresaForm.rut),
+        });
         if (res.success) setEditEmpresaId(null);
-        else setFormError(res.message!);
+        else {
+            setFormError(res.message!);
+            setDismissedError(null);
+        }
         setActionLoading(null);
     };
 
@@ -223,6 +316,7 @@ const InventoryPage: React.FC = () => {
         });
         if (!result.success) {
             setFormError(result.message || 'No se pudo renovar el contrato');
+            setDismissedError(null);
         }
         setActionLoading(null);
     };
@@ -233,13 +327,15 @@ const InventoryPage: React.FC = () => {
 
         setActionLoading(impresoraId);
         const isOutOfService = currentPrinter.estado === 'Fuera de Servicio' || currentPrinter.estado === 'En Servicio';
+        const contractState = getContractState(currentPrinter);
 
         const result = await updateImpresora(impresoraId, {
-            estado: isOutOfService ? 'Disponible' : 'Fuera de Servicio',
+            estado: isOutOfService ? contractState : 'Fuera de Servicio',
         });
 
         if (!result.success) {
             setFormError(result.message || 'No se pudo cambiar el estado de servicio');
+            setDismissedError(null);
         }
         setActionLoading(null);
     };
@@ -353,20 +449,27 @@ const InventoryPage: React.FC = () => {
         if (!selectedMaintenancePrinter?.id || !allIssuesRepaired) return;
 
         setActionLoading(selectedMaintenancePrinter.id);
+        const contractState = getContractState(selectedMaintenancePrinter);
         const result = await updateImpresora(selectedMaintenancePrinter.id, {
-            estado: 'Disponible',
-            empresa_id: null,
-            fecha_inicio: null,
-            fecha_termino: null,
+            estado: contractState,
+            empresa_id: selectedMaintenancePrinter.empresa_id || null,
+            fecha_inicio: selectedMaintenancePrinter.fecha_inicio || null,
+            fecha_termino: selectedMaintenancePrinter.fecha_termino || null,
         });
 
         if (!result.success) {
             setFormError(result.message || 'No se pudo dar de alta la impresora');
+            setDismissedError(null);
         } else {
             setMaintenancePrinterId(null);
             setMaintenanceIssues([]);
         }
         setActionLoading(null);
+    };
+
+    const closeErrorModal = () => {
+        setDismissedError(activeErrorMessage);
+        setFormError(null);
     };
 
     return (
@@ -403,10 +506,129 @@ const InventoryPage: React.FC = () => {
                 </button>
             </div>
 
-            {/* ERROR ALERT */}
-            {(error || formError) && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center text-red-400 text-sm gap-3">
-                    <p>{formError || error}</p>
+            {visibleErrorMessage && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm"
+                    onClick={closeErrorModal}
+                >
+                    <div
+                        className="w-full max-w-md rounded-2xl border border-red-500/20 bg-slate-950/95 p-5 shadow-2xl shadow-black/50"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-start gap-3">
+                            <div className="rounded-full bg-red-500/10 p-2 text-red-400">
+                                <AlertCircle className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-base font-semibold text-slate-100">Confirmación</h3>
+                                <p className="mt-2 text-sm leading-6 text-slate-300">{visibleErrorMessage}</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={closeErrorModal}
+                                className="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-400"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {confirmDeleteEmpresaId !== null && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm"
+                    onClick={cancelDeleteEmpresa}
+                >
+                    <div
+                        className="w-full max-w-md rounded-2xl border border-amber-500/20 bg-slate-950/95 p-5 shadow-2xl shadow-black/50"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-start gap-3">
+                            <div className="rounded-full bg-amber-500/10 p-2 text-amber-400">
+                                <AlertCircle className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-base font-semibold text-slate-100">Confirmación</h3>
+                                <p className="mt-2 text-sm leading-6 text-slate-300">
+                                    ¿Estás seguro de que deseas eliminar esta empresa? Esta acción no se puede deshacer.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={cancelDeleteEmpresa}
+                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+                                disabled={actionLoading !== null}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDeleteEmpresa(confirmDeleteEmpresaId)}
+                                className="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-400 disabled:opacity-50"
+                                disabled={actionLoading !== null}
+                            >
+                                {actionLoading === confirmDeleteEmpresaId ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    'Eliminar'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {confirmDeletePrinterId !== null && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm"
+                    onClick={cancelDeletePrinter}
+                >
+                    <div
+                        className="w-full max-w-md rounded-2xl border border-amber-500/20 bg-slate-950/95 p-5 shadow-2xl shadow-black/50"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="flex items-start gap-3">
+                            <div className="rounded-full bg-amber-500/10 p-2 text-amber-400">
+                                <AlertCircle className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-base font-semibold text-slate-100">Confirmación</h3>
+                                <p className="mt-2 text-sm leading-6 text-slate-300">
+                                    ¿Estás seguro de que deseas eliminar esta impresora? Esta acción no se puede deshacer.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={cancelDeletePrinter}
+                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+                                disabled={actionLoading !== null}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDeleteImpresora(confirmDeletePrinterId)}
+                                className="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-400 disabled:opacity-50"
+                                disabled={actionLoading !== null}
+                            >
+                                {actionLoading === confirmDeletePrinterId ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    'Eliminar'
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -696,7 +918,7 @@ const InventoryPage: React.FC = () => {
                                                         <button onClick={() => startEditImpresora(i)} disabled={actionLoading === i.id} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-500/20">
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
-                                                        <button onClick={() => handleDeleteImpresora(i.id!)} disabled={actionLoading === i.id} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20">
+                                                        <button onClick={() => openDeletePrinterConfirm(i.id!, i.empresa_id)} disabled={actionLoading === i.id} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20">
                                                             {actionLoading === i.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                                         </button>
                                                     </td>
@@ -726,6 +948,7 @@ const InventoryPage: React.FC = () => {
                                 placeholder="RUT (ej. 12345678-9)"
                                 value={empresaForm.rut}
                                 onChange={e => setEmpresaForm({ ...empresaForm, rut: e.target.value })}
+                                onBlur={e => setEmpresaForm({ ...empresaForm, rut: normalizeRutInput(e.target.value) })}
                                 className="w-full md:w-1/4 bg-black/30 border border-white/5 text-foreground hover:bg-black/40 transition-colors rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500/50 outline-none"
                             />
                             <input
@@ -766,7 +989,7 @@ const InventoryPage: React.FC = () => {
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col gap-2">
                                                             <input value={editEmpresaForm.razon_social} onChange={ev => setEditEmpresaForm({ ...editEmpresaForm, razon_social: ev.target.value })} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-sm outline-none w-full" placeholder="Razón Social" />
-                                                            <input value={editEmpresaForm.rut} onChange={ev => setEditEmpresaForm({ ...editEmpresaForm, rut: ev.target.value })} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-full" placeholder="RUT" />
+                                                            <input value={editEmpresaForm.rut} onChange={ev => setEditEmpresaForm({ ...editEmpresaForm, rut: ev.target.value })} onBlur={ev => setEditEmpresaForm({ ...editEmpresaForm, rut: normalizeRutInput(ev.target.value) })} className="bg-black/50 border border-white/10 text-foreground rounded-md px-2 py-1 text-xs outline-none w-full" placeholder="RUT" />
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
@@ -802,7 +1025,15 @@ const InventoryPage: React.FC = () => {
                                                         <button onClick={() => startEditEmpresa(e)} disabled={actionLoading === e.id} className="p-2 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors border border-transparent hover:border-indigo-500/20">
                                                             <Edit2 className="w-4 h-4" />
                                                         </button>
-                                                        <button onClick={() => handleDeleteEmpresa(e.id!)} disabled={actionLoading === e.id} title="Eliminar Empresa" className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20">
+                                                        <button
+                                                            onClick={() => handleDetachEmpresaActivos(e.id!)}
+                                                            disabled={actionLoading === e.id || (e.cant_equipos || 0) === 0}
+                                                            title={(e.cant_equipos || 0) === 0 ? 'No hay impresoras asociadas' : 'Desligar impresoras de la empresa'}
+                                                            className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors border border-transparent hover:border-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        >
+                                                            {actionLoading === e.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlink2 className="w-4 h-4" />}
+                                                        </button>
+                                                        <button onClick={() => openDeleteEmpresaConfirm(e.id!, e.cant_equipos)} disabled={actionLoading === e.id} title="Eliminar Empresa" className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20">
                                                             {actionLoading === e.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                                         </button>
                                                     </td>
