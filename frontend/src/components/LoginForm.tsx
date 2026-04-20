@@ -46,9 +46,16 @@ export const LoginForm: React.FC = () => {
 
                     <form onSubmit={handleSubmit} className="space-y-6 relative">
                         {error && (
-                            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center text-red-400 text-sm gap-3 animate-in slide-in-from-top-2">
-                                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                                <p>{error}</p>
+                            <div className="mx-auto w-full max-w-sm rounded-2xl border border-red-500/20 bg-slate-950/90 p-4 text-sm text-red-300 shadow-lg shadow-black/30">
+                                <div className="flex items-start gap-3">
+                                    <div className="rounded-full bg-red-500/10 p-2 text-red-400">
+                                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-sm font-semibold text-slate-100">Confirmación</h3>
+                                        <p className="mt-1 leading-5 text-slate-300">{error}</p>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
