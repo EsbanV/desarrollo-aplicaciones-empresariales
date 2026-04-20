@@ -6,3 +6,4 @@ python-dotenv
 flask-cors
 dotenv
 flask-jwt-extended
+locust
